@@ -1,0 +1,32 @@
+appId: com.kongling.mail
+productName: 空灵邮箱
+copyright: Copyright © 2026 cool
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asar: true
+compression: maximum
+linux:
+  executableName: kongling-mail
+  category: Network;Email;
+  maintainer: cool
+  icon: build/icon.png
+  synopsis: 本地桌面邮箱管理客户端
+  description: 支持 IMAP/SMTP/POP3/OAuth2/Exchange 的本地邮箱管理软件
+  target:
+    - target: AppImage
+      arch:
+        - x64
+        - arm64
+    - target: deb
+      arch:
+        - x64
+        - arm64
+appImage:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+npmRebuild: false
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/

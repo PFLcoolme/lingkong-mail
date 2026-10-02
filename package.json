@@ -1,0 +1,50 @@
+{
+  "name": "kongling-mail",
+  "productName": "空灵邮箱",
+  "version": "0.1.0",
+  "description": "适用于 Linux 的本地桌面邮箱管理客户端",
+  "main": "out/main/index.js",
+  "author": "cool",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "rebuild": "electron-builder install-app-deps",
+    "dist": "npm run build && electron-builder --linux AppImage",
+    "dist:deb": "npm run build && electron-builder --linux deb",
+    "dist:all": "npm run build && electron-builder --linux AppImage deb"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.4.0",
+    "@mui/material": "^9.4.0",
+    "@mui/utils": "^9.4.0",
+    "better-sqlite3": "^13.0.3",
+    "dompurify": "^3.4.16",
+    "imapflow": "^2.2.1",
+    "lucide-react": "^0.549.0",
+    "mailparser": "^3.9.33",
+    "nodemailer": "^10.0.13",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.0"
+  }
+}

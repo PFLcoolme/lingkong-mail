@@ -1,0 +1,121 @@
+# 空灵邮箱（Kongling Mail）
+
+一款面向 Linux 桌面的本地邮件管理客户端。所有邮件正文与附件缓存在本机 SQLite 数据库中，支持离线浏览与全文检索；凭据使用系统密钥环（libsecret）加密保存。
+
+## 界面设计
+
+- **彻底无边框**：移除了系统原生标题栏，使用自绘标题栏（可拖动、双击最大化、最小化/最大化/关闭按钮），窗口带圆角与柔和投影
+- **毛玻璃质感**：面板使用 `backdrop-filter` 高斯模糊 + 半透明背景 + 细腻描边，层次分明
+- **简约黑白灰 / 白色主调**：中性色板，近黑作为强调色，默认浅色主题（可切换深色或跟随系统）
+- 组件基于 **MUI (Material UI)** 统一构建，全部交互控件具备键盘可达性与 ARIA 标注
+- 若某些 Linux 合成器下透明窗口表现异常（发黑），可在「设置 → 常规」中关闭「毛玻璃透明背景」
+
+## 功能一览
+
+- **多账户管理**：可同时添加任意数量的邮箱，支持启用/停用、颜色标识、独立签名
+- **协议支持**
+  - IMAP + SMTP（推荐，完整文件夹/状态同步）
+  - POP3（自研客户端，兼容老旧邮箱）
+  - Exchange / Office365（EWS SOAP 接口）
+  - OAuth2 授权登录（Gmail、Outlook，PKCE + 回环地址）
+- **自动配置发现**：内置 QQ、163、126、Gmail、Outlook、iCloud、腾讯/网易企业邮等预设，未命中时尝试 Mozilla autoconfig、DNS SRV 与端口探测
+- **邮件收发**：HTML/纯文本阅读（沙箱 iframe + DOMPurify 消毒，默认拦截远程图片）、回复/全部回复/转发、附件上传下载、草稿箱
+- **本地全文搜索**：SQLite FTS5，中文按字切分，支持跨账户跨文件夹检索
+- **过滤规则**：按发件人/收件人/主题/正文匹配，执行标记已读、加星标、移动、删除、免打扰
+- **桌面通知**：新邮件系统通知（可在设置中关闭）
+- **地址簿**：收发自动收集，撰写时自动补全
+- **定时同步**：可配置检查间隔，启动时自动同步
+
+## 运行方式
+
+### 开发模式
+
+```bash
+npm install
+npm run dev
+```
+
+### 构建与打包
+
+```bash
+npm run build          # 编译到 out/
+npm run dist           # 打包 AppImage（输出到 dist/）
+npm run dist:deb       # 打包 deb
+```
+
+打包产物：`dist/空灵邮箱-0.1.0-x86_64.AppImage`，赋予执行权限后直接双击或命令行运行即可。
+
+```bash
+chmod +x dist/空灵邮箱-0.1.0-x86_64.AppImage
+./dist/空灵邮箱-0.1.0-x86_64.AppImage
+```
+
+### 启动后看不到界面？按顺序排查
+
+1. **缺 FUSE（Ubuntu 24.04 等新发行版常见）**：AppImage 需要 FUSE 才能挂载
+   ```bash
+   ./dist/空灵邮箱-0.1.0-x86_64.AppImage --appimage-extract-and-run   # 免 FUSE 运行
+   # 或安装 FUSE：sudo apt install libfuse2
+   ```
+2. **透明窗口与合成器不兼容**：默认已关闭透明背景；若你手动开启后窗口不可见/发黑，
+   到「设置 → 常规」关闭「毛玻璃透明背景」，或直接删除配置目录后重启：
+   `rm -rf ~/.config/空灵邮箱`
+3. **看具体报错**：在终端运行（不要双击），终端会打印详细日志
+   ```bash
+   ELECTRON_ENABLE_LOGGING=1 ./dist/空灵邮箱-0.1.0-x86_64.AppImage
+   ```
+4. **Wayland 会话**：可强制 X11 模式运行
+   ```bash
+   ./dist/空灵邮箱-0.1.0-x86_64.AppImage --ozone-platform=x11
+   ```
+
+> 说明：国内网络环境下首次安装需为 Electron 配置镜像，例如
+> `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node node_modules/electron/install.js`
+
+## 添加邮箱
+
+1. 打开应用后点击左侧「添加邮箱账户」（或左下角设置 → 账户）
+2. 输入邮箱地址，程序会自动探测服务器配置
+3. 选择账户类型（IMAP / POP3 / Exchange），确认服务器地址、端口与加密方式
+4. 选择登录方式
+   - **密码 / 授权码**：QQ、163、126、Gmail 等需在网页端开启 IMAP/SMTP 并生成**授权码**，用授权码代替登录密码
+   - **OAuth2**：需先在 Google Cloud 或 Azure 创建「桌面应用」类型的 OAuth 客户端，填入 Client ID 后点击「在浏览器中授权」
+5. 点击「测试连接」确认无误后完成添加，程序会立即开始首次同步
+
+## 数据存储
+
+| 内容 | 路径 |
+| --- | --- |
+| 数据库 | `~/.config/空灵邮箱/mail.db` |
+| 附件 | `~/.config/空灵邮箱/attachments/` |
+| 凭据 | 系统密钥环（libsecret），不可用时退化为混淆存储 |
+
+## 目录结构
+
+```
+electron/
+  main/
+    index.ts              应用入口与自动同步调度
+    window.ts             无边框/透明窗口创建与窗口控制
+    settings-defaults.ts  主进程默认设置
+    ipc/                  IPC 接口（账户 / 邮件 / 其他）
+    services/             数据库、IMAP、POP3、EWS、SMTP、OAuth、同步引擎、规则、联系人
+  preload/index.ts        contextBridge 暴露的 window.api
+shared/                   主进程与渲染进程共享的类型与 API 契约
+src/
+  theme.ts                MUI 主题（毛玻璃、黑白灰、圆角与阴影体系）
+  components/             TitleBar / Sidebar / MessageList / ReadingPane / Composer / 设置 / 向导
+  store/app.ts            zustand 应用状态
+```
+
+## 快捷键与操作
+
+- `Ctrl + Enter`：撰写窗口中发送邮件
+- 列表支持多选（标记已读 / 加星标 / 移动 / 删除）
+- 顶部搜索框为跨账户全文搜索，列表内过滤框仅作用于当前文件夹
+
+## 已知限制
+
+- POP3 账户只同步收件箱，不支持服务器端文件夹与已读状态回写
+- Exchange 账户当前使用 Basic / Bearer 认证，未实现 NTLM
+- IDLE 实时推送未启用，新邮件依赖定时轮询（可在设置中调整间隔）

@@ -1,0 +1,255 @@
+/** 主进程与渲染进程共享的类型定义 */
+
+export type ProtocolType = 'imap' | 'pop3' | 'ews'
+export type AuthType = 'password' | 'oauth2'
+export type SecurityType = 'none' | 'ssl' | 'starttls'
+export type FolderType = 'inbox' | 'sent' | 'drafts' | 'trash' | 'junk' | 'archive' | 'other'
+
+export interface ServerConfig {
+  host: string
+  port: number
+  security: SecurityType
+  username: string
+}
+
+export interface AccountConfig {
+  id: string
+  name: string
+  email: string
+  displayName: string
+  protocol: ProtocolType
+  authType: AuthType
+  incoming: ServerConfig
+  outgoing: ServerConfig
+  /** Exchange Web Services 地址 */
+  ewsUrl: string
+  /** OAuth2 提供方标识，如 gmail / outlook */
+  oauthProvider: string
+  oauthClientId: string
+  oauthClientSecret: string
+  oauthTenant: string
+  /** POP3 收取后是否在服务器保留（默认保留） */
+  keepOnServer: boolean
+  /** 已同步的历史天数上限 */
+  syncDays: number
+  signature: string
+  signatureHtml: string
+  color: string
+  enabled: boolean
+  createdAt: number
+  sortOrder: number
+}
+
+export interface AccountCredentials {
+  password: string
+  refreshToken: string
+  accessToken: string
+  expiresAt: number
+}
+
+export interface Account extends AccountConfig {
+  status: AccountStatus
+  lastError: string
+}
+
+export type AccountStatus = 'idle' | 'connecting' | 'ready' | 'error' | 'auth-error'
+
+export interface Folder {
+  id: string
+  accountId: string
+  path: string
+  name: string
+  delimiter: string
+  type: FolderType
+  unread: number
+  total: number
+  uidValidity: number
+  lastUid: number
+  syncedAt: number
+}
+
+export interface Address {
+  name?: string
+  address: string
+}
+
+export interface Attachment {
+  id: string
+  messageId: string
+  filename: string
+  mimeType: string
+  size: number
+  path: string
+  contentId: string
+  inline: boolean
+}
+
+export interface MessageSummary {
+  id: string
+  accountId: string
+  folderId: string
+  uid: number
+  messageId: string
+  inReplyTo: string
+  subject: string
+  from: Address[]
+  to: Address[]
+  cc: Address[]
+  bcc: Address[]
+  date: number
+  size: number
+  seen: boolean
+  flagged: boolean
+  answered: boolean
+  draft: boolean
+  attachmentCount: number
+  snippet: string
+  hasHtml: boolean
+}
+
+export interface Message extends MessageSummary {
+  bodyText: string
+  bodyHtml: string
+  headers: Record<string, string>
+  attachments: Attachment[]
+}
+
+export interface Contact {
+  id: string
+  accountId: string
+  name: string
+  email: string
+  frequency: number
+  lastUsedAt: number
+}
+
+export type RuleField = 'from' | 'to' | 'subject' | 'body'
+export type RuleOperator = 'contains' | 'notContains' | 'equals' | 'startsWith' | 'regex'
+export type RuleActionType = 'markRead' | 'flag' | 'move' | 'delete' | 'skipNotification'
+
+export interface RuleCondition {
+  field: RuleField
+  operator: RuleOperator
+  value: string
+}
+
+export interface RuleAction {
+  type: RuleActionType
+  target: string
+}
+
+export interface Rule {
+  id: string
+  accountId: string
+  name: string
+  enabled: boolean
+  order: number
+  matchAll: boolean
+  conditions: RuleCondition[]
+  actions: RuleAction[]
+}
+
+export interface Draft {
+  id: string
+  accountId: string
+  to: string
+  cc: string
+  bcc: string
+  subject: string
+  bodyText: string
+  bodyHtml: string
+  inReplyTo: string
+  references: string
+  replyFolderId: string
+  replyUid: number
+  forwardAttachments: string[]
+  attachments: string[]
+  updatedAt: number
+}
+
+export interface SendPayload {
+  accountId: string
+  to: string[]
+  cc: string[]
+  bcc: string[]
+  subject: string
+  text: string
+  html: string
+  attachments: { filename: string; path: string }[]
+  inReplyTo: string
+  references: string
+  saveToSent: boolean
+}
+
+export interface ListQuery {
+  accountId: string
+  folderId: string
+  limit: number
+  offset: number
+  unreadOnly: boolean
+  flaggedOnly: boolean
+  withAttachmentsOnly: boolean
+  search: string
+}
+
+export interface SearchQuery {
+  query: string
+  accountId: string
+  folderId: string
+  limit: number
+}
+
+export interface SearchHit extends MessageSummary {
+  accountName: string
+  accountColor: string
+  folderName: string
+}
+
+export interface SyncState {
+  accountId: string
+  folderId: string
+  running: boolean
+  progress: number
+  message: string
+  fetched: number
+}
+
+export type MainEvent =
+  | { type: 'sync-state'; payload: SyncState }
+  | { type: 'messages-changed'; payload: { accountId: string; folderId: string } }
+  | { type: 'folders-changed'; payload: { accountId: string } }
+  | { type: 'accounts-changed'; payload: null }
+  | { type: 'new-message'; payload: MessageSummary }
+  | { type: 'error'; payload: { title: string; message: string } }
+  | { type: 'toast'; payload: { level: 'info' | 'success' | 'error'; message: string } }
+
+export interface AppSettings {
+  theme: 'system' | 'light' | 'dark'
+  fontSize: number
+  checkIntervalMinutes: number
+  notifications: boolean
+  readPanePosition: 'right' | 'bottom'
+  confirmBeforeDelete: boolean
+  showSnippet: boolean
+  autoStartSync: boolean
+  markReadDelayMs: number
+  language: string
+  /** 毛玻璃透明背景（个别 Linux 合成器下关闭可避免窗口发黑） */
+  transparentBackground: boolean
+}
+
+export interface ProviderPreset {
+  id: string
+  name: string
+  domains: string[]
+  imap: Omit<ServerConfig, 'username'>
+  smtp: Omit<ServerConfig, 'username'>
+  oauth?: boolean
+  note: string
+}
+
+export interface AutoconfigResult {
+  imap: Omit<ServerConfig, 'username'>
+  smtp: Omit<ServerConfig, 'username'>
+  source: string
+}
