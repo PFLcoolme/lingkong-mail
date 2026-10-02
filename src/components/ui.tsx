@@ -130,9 +130,16 @@ export function Switch({
 }): ReactNode {
   return (
     <FormControlLabel
-      control={<MuiSwitch checked={checked} onChange={(e) => onChange(e.target.checked)} />}
+      labelPlacement="start"
+      control={
+        <MuiSwitch
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          slotProps={{ input: { 'aria-label': label } }}
+        />
+      }
       label={<Typography sx={{ fontSize: 13 }}>{label}</Typography>}
-      sx={{ ml: 0 }}
+      sx={{ ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', gap: 2 }}
     />
   )
 }

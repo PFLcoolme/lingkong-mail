@@ -166,9 +166,50 @@ export function buildTheme(mode: ThemeMode): Theme {
         styleOverrides: { root: { borderColor: light ? 'rgba(9,9,11,0.07)' : 'rgba(255,255,255,0.08)' } }
       },
       MuiSwitch: {
+        defaultProps: { disableRipple: true },
         styleOverrides: {
-          track: { borderRadius: 12 },
-          thumb: { boxShadow: 'none' }
+          root: {
+            width: 50,
+            height: 30,
+            padding: 0,
+            display: 'inline-flex',
+            overflow: 'visible',
+            '& .MuiSwitch-switchBase': {
+              padding: 0,
+              margin: 2,
+              transitionDuration: '240ms',
+              transitionTimingFunction: 'cubic-bezier(0.32, 0.72, 0, 1)',
+              '&.Mui-checked': {
+                transform: 'translateX(20px)',
+                '& + .MuiSwitch-track': {
+                  backgroundColor: light ? '#34c759' : '#30d158',
+                  opacity: 1,
+                  border: 0
+                },
+                '&.Mui-disabled + .MuiSwitch-track': { opacity: 0.45 }
+              },
+              '&.Mui-focusVisible .MuiSwitch-thumb': {
+                border: '6px solid #fff',
+                boxShadow: '0 0 0 2px rgba(52,199,89,0.45)'
+              },
+              '&.Mui-disabled .MuiSwitch-thumb': { color: light ? '#fafafa' : '#4a4a4d' },
+              '&.Mui-disabled + .MuiSwitch-track': { opacity: light ? 0.7 : 0.35 }
+            },
+            '& .MuiSwitch-thumb': {
+              boxSizing: 'border-box',
+              width: 26,
+              height: 26,
+              color: '#ffffff',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.14)'
+            },
+            '& .MuiSwitch-track': {
+              borderRadius: 15,
+              backgroundColor: light ? '#e9e9ea' : '#39393d',
+              opacity: 1,
+              border: 0,
+              transition: 'background-color 240ms cubic-bezier(0.32, 0.72, 0, 1)'
+            }
+          }
         }
       },
       MuiMenu: {
