@@ -11,7 +11,8 @@ export function createMainWindow(): BrowserWindow {
   const transparent = settings.transparentBackground === true
   const dark =
     settings.theme === 'dark' || (settings.theme === 'system' && nativeTheme.shouldUseDarkColors)
-  const opaque = dark ? '#0c0c0e' : '#f4f4f5'
+  // 与渲染层 body 底色（palette.background.default）保持一致，避免加载瞬间与四角色差
+  const opaque = dark ? '#0c0c0e' : '#f2f2f4'
   window = new BrowserWindow({
     width: 1320,
     height: 880,

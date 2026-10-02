@@ -46,6 +46,7 @@ export default function App(): React.ReactNode {
     settings.theme === 'system' ? (systemDark ? 'dark' : 'light') : settings.theme === 'dark' ? 'dark' : 'light'
   const theme = useMemo(() => buildTheme(mode), [mode])
   const [maximized, setMaximized] = useState(false)
+  const glassWindow = settings.transparentBackground === true
 
   useEffect(() => {
     void api.windowIsMaximized().then(setMaximized)
@@ -60,17 +61,19 @@ export default function App(): React.ReactNode {
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          bgcolor: settings.transparentBackground
+          // 只有透明窗口才做圆角玻璃卡片；不透明窗口保持满铺，避免四角色差
+          bgcolor: glassWindow
             ? mode === 'light'
               ? alpha('#ffffff', 0.7)
               : alpha('#0c0c0e', 0.7)
-            : mode === 'light'
-              ? '#f4f4f5'
-              : '#0c0c0e',
-          borderRadius: maximized ? 0 : 4,
+            : 'transparent',
+          borderRadius: !glassWindow || maximized ? 0 : 4,
           overflow: 'hidden',
-          border: maximized ? 'none' : `1px solid ${alpha(mode === 'light' ? '#09090b' : '#ffffff', 0.08)}`,
-          boxShadow: maximized ? 'none' : '0 18px 60px rgba(9,9,11,0.22)'
+          border:
+            !glassWindow || maximized
+              ? 'none'
+              : `1px solid ${alpha(mode === 'light' ? '#09090b' : '#ffffff', 0.08)}`,
+          boxShadow: !glassWindow || maximized ? 'none' : '0 18px 60px rgba(9,9,11,0.22)'
         }}
       >
         <TitleBar />
