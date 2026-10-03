@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { settingsGet } from './services/accounts'
 import { DEFAULT_SETTINGS as DEFAULTS } from './settings-defaults'
+import { hasTray } from './tray'
 
 let window: BrowserWindow | null = null
 
@@ -34,6 +35,15 @@ export function createMainWindow(): BrowserWindow {
   })
 
   window.once('ready-to-show', () => window?.show())
+
+  // 关闭时最小化到托盘（而非退出）
+  window.on('close', (event) => {
+    const settings = { ...DEFAULTS, ...settingsGet<Partial<typeof DEFAULTS>>('app', {}) }
+    if (settings.closeToTray === false) return
+    if (!hasTray()) return
+    event.preventDefault()
+    window?.hide()
+  })
 
   // 调试用：设置 KONGLING_SCREENSHOT=/path.png 可自动截取界面
   if (process.env.KONGLING_SCREENSHOT) {

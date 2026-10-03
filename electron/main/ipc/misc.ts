@@ -1,9 +1,11 @@
 import { app, shell } from 'electron'
 import { getMainWindow } from '../window'
-import type { AppSettings, Contact, Rule } from '@shared/types'
+import type { AppSettings, Contact, Rule, Template } from '@shared/types'
 import { handle } from './common'
 import { deleteContact, listContacts, saveContact, searchContacts } from '../services/contacts'
 import { deleteRule, listRules, saveRule } from '../services/rules'
+import { deleteTemplate, listTemplates, saveTemplate } from '../services/templates'
+import { translateText } from '../services/translate'
 import { settingsGet, settingsSet } from '../services/accounts'
 import { authorizeWithBrowser, OAUTH_PROVIDERS } from '../services/oauth'
 import { emit } from '../services/sync'
@@ -42,8 +44,31 @@ export function registerMiscHandlers(): void {
     const current = { ...DEFAULT_SETTINGS, ...settingsGet<Partial<AppSettings>>('app', {}) }
     const next = { ...current, ...patch }
     settingsSet('app', next)
+    if (patch.openAtLogin !== undefined) {
+      app.setLoginItemSettings({ openAtLogin: patch.openAtLogin })
+    }
     return next
   })
+
+  handle('templates:list', () => listTemplates())
+
+  handle('template:save', async (_event, template: Partial<Template>) => saveTemplate(template))
+
+  handle('template:delete', async (_event, id: string) => {
+    deleteTemplate(id)
+    return true
+  })
+
+  handle(
+    'translate:text',
+    async (_event, input: { text: string; target: string; source?: string; endpoint?: string }) =>
+      translateText({
+        text: input.text,
+        target: input.target,
+        source: input.source,
+        endpoint: input.endpoint
+      })
+  )
 
   handle('oauth:providers', () => OAUTH_PROVIDERS)
 

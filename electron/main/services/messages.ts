@@ -196,9 +196,90 @@ export function getAttachments(messageId: string): Attachment[] {
   }))
 }
 
+export interface SearchFilters {
+  text: string
+  from: string
+  to: string
+  subject: string
+  hasAttachment: boolean
+  unread?: boolean
+  flagged: boolean
+  before: number
+  after: number
+  folderName: string
+}
+
+function parseDateValue(input: string): number {
+  const normalized = input.replace(/\//g, '-')
+  const time = Date.parse(normalized)
+  return Number.isNaN(time) ? 0 : time
+}
+
+/** 解析高级搜索语法：from: to: subject: has:attachment is:unread before: after: in: */
+export function parseSearchQuery(input: string): SearchFilters {
+  const filters: SearchFilters = {
+    text: '',
+    from: '',
+    to: '',
+    subject: '',
+    hasAttachment: false,
+    flagged: false,
+    before: 0,
+    after: 0,
+    folderName: ''
+  }
+  const tokens = input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? []
+  const rest: string[] = []
+  for (const token of tokens) {
+    const matched = token.match(/^(from|to|subject|has|is|before|after|in):(.+)$/i)
+    if (!matched) {
+      rest.push(token)
+      continue
+    }
+    const key = matched[1].toLowerCase()
+    const value = matched[2].replace(/^["']|["']$/g, '')
+    switch (key) {
+      case 'from':
+        filters.from = value
+        break
+      case 'to':
+        filters.to = value
+        break
+      case 'subject':
+        filters.subject = value
+        break
+      case 'has':
+        if (/attachment|附件/i.test(value)) filters.hasAttachment = true
+        break
+      case 'is':
+        if (/^unread|未读/i.test(value)) filters.unread = true
+        else if (/^read|已读/i.test(value)) filters.unread = false
+        else if (/flag|star|星标/i.test(value)) filters.flagged = true
+        break
+      case 'before':
+        filters.before = parseDateValue(value)
+        break
+      case 'after':
+        filters.after = parseDateValue(value)
+        break
+      case 'in':
+        filters.folderName = value
+        break
+      default:
+        break
+    }
+  }
+  filters.text = rest.join(' ').trim()
+  return filters
+}
+
 export function listMessages(query: ListQuery): MessageSummary[] {
   const db = getDb()
-  const where: string[] = ['m.account_id = ?', 'm.folder_id = ?']
+  const where: string[] = [
+    'm.account_id = ?',
+    'm.folder_id = ?',
+    'm.id NOT IN (SELECT message_id FROM snoozed)'
+  ]
   const params: unknown[] = [query.accountId, query.folderId]
   if (query.unreadOnly) where.push('m.seen = 0')
   if (query.flaggedOnly) where.push('m.flagged = 1')
@@ -294,7 +375,8 @@ function buildMatchExpression(input: string): string {
 }
 
 export function searchMessages(query: SearchQuery): SearchHit[] {
-  const match = buildMatchExpression(query.query)
+  const filters = parseSearchQuery(query.query)
+  const match = buildMatchExpression(filters.text)
   const db = getDb()
   const where: string[] = []
   const params: unknown[] = []
@@ -309,6 +391,40 @@ export function searchMessages(query: SearchQuery): SearchHit[] {
   if (query.folderId) {
     where.push('m.folder_id = ?')
     params.push(query.folderId)
+  }
+  if (filters.from) {
+    where.push('m.from_json LIKE ?')
+    params.push(`%${filters.from}%`)
+  }
+  if (filters.to) {
+    where.push('(m.to_json LIKE ? OR m.cc_json LIKE ?)')
+    params.push(`%${filters.to}%`, `%${filters.to}%`)
+  }
+  if (filters.subject) {
+    where.push('m.subject LIKE ?')
+    params.push(`%${filters.subject}%`)
+  }
+  if (filters.hasAttachment) {
+    where.push('m.attachment_count > 0')
+  }
+  if (filters.unread !== undefined) {
+    where.push('m.seen = ?')
+    params.push(filters.unread ? 0 : 1)
+  }
+  if (filters.flagged) {
+    where.push('m.flagged = 1')
+  }
+  if (filters.before) {
+    where.push('m.date <= ?')
+    params.push(filters.before)
+  }
+  if (filters.after) {
+    where.push('m.date >= ?')
+    params.push(filters.after)
+  }
+  if (filters.folderName) {
+    where.push('f.name LIKE ?')
+    params.push(`%${filters.folderName}%`)
   }
   if (!where.length) return []
   params.push(query.limit ?? 100)

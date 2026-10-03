@@ -7,6 +7,8 @@ import { registerAccountHandlers } from './ipc/accounts'
 import { registerMailHandlers } from './ipc/mail'
 import { registerMiscHandlers, DEFAULT_SETTINGS } from './ipc/misc'
 import { createMainWindow, getMainWindow, loadRenderer } from './window'
+import { refreshTray, setupTray } from './tray'
+import { startScheduler } from './scheduler'
 import type { MainEvent } from '@shared/types'
 
 process.env.DIST_ELECTRON = join(__dirname, '../')
@@ -73,6 +75,12 @@ void app.whenReady().then(() => {
   const window = createMainWindow()
   loadRenderer(window)
   scheduleAutoSync()
+  setupTray()
+  setInterval(() => refreshTray(), 30000)
+  startScheduler()
+  if (settings.openAtLogin) {
+    app.setLoginItemSettings({ openAtLogin: true })
+  }
   ipcMain.on('settings:changed', () => scheduleAutoSync())
   if (settings.autoStartSync) {
     setTimeout(() => {

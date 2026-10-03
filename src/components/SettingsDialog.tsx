@@ -18,19 +18,21 @@ import AddIcon from '@mui/icons-material/AddRounded'
 import DeleteIcon from '@mui/icons-material/DeleteOutlineRounded'
 import PersonAddIcon from '@mui/icons-material/PersonAddRounded'
 import FolderIcon from '@mui/icons-material/FolderOpenRounded'
-import type { Account, Rule, RuleActionType, RuleField, RuleOperator } from '@shared/types'
+import type { Account, Rule, RuleActionType, RuleField, RuleOperator, Template } from '@shared/types'
 import { api } from '@/lib/api'
 import { useApp } from '@/store/app'
 import { Avatar, Field, Modal, SectionTitle, Switch } from './ui'
+import { useT } from '@/lib/i18n'
 import { formatFullDate } from '@/lib/format'
 
-const TABS = ['账户', '常规', '签名', '规则', '联系人', '关于']
+const TABS = ['accounts', 'general', 'signature', 'rules', 'contacts', 'templates', 'about']
 
 export default function SettingsDialog(): React.ReactNode {
   const [tab, setTab] = useState(0)
   const close = useApp((s) => s.closeSettings)
+  const t = useT()
   return (
-    <Modal title="设置" onClose={close} width={900} fullHeight>
+    <Modal title={t('settings.title')} onClose={close} width={900} fullHeight>
       <Stack direction="row" spacing={2.5} sx={{ height: '100%', minHeight: 420 }}>
         <Box sx={{ width: 118, flexShrink: 0 }}>
           <Tabs
@@ -39,8 +41,8 @@ export default function SettingsDialog(): React.ReactNode {
             onChange={(_, value: number) => setTab(value)}
             sx={{ '& .MuiTab-root': { alignItems: 'flex-start', minHeight: 34, fontSize: 13, borderRadius: 2 } }}
           >
-            {TABS.map((label) => (
-              <Tab key={label} label={label} />
+            {TABS.map((key) => (
+              <Tab key={key} label={t(`settings.${key}`)} />
             ))}
           </Tabs>
         </Box>
@@ -51,7 +53,8 @@ export default function SettingsDialog(): React.ReactNode {
           {tab === 2 ? <SignatureTab /> : null}
           {tab === 3 ? <RulesTab /> : null}
           {tab === 4 ? <ContactsTab /> : null}
-          {tab === 5 ? <AboutTab /> : null}
+          {tab === 5 ? <TemplatesTab /> : null}
+          {tab === 6 ? <AboutTab /> : null}
         </Box>
       </Stack>
     </Modal>
@@ -202,6 +205,7 @@ function AccountEditor({ account, onDone }: { account: Account; onDone: () => Pr
 function GeneralTab(): React.ReactNode {
   const settings = useApp((s) => s.settings)
   const update = useApp((s) => s.updateSettings)
+  const t = useT()
   return (
     <Stack spacing={3}>
       <Box>
@@ -229,6 +233,22 @@ function GeneralTab(): React.ReactNode {
             label="毛玻璃透明背景（关闭后窗口不透明，可解决个别桌面环境发黑）"
           />
         </Stack>
+        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+          {[
+            { code: 'zh-CN', label: '中文' },
+            { code: 'en', label: 'English' }
+          ].map((item) => (
+            <Button
+              key={item.code}
+              size="small"
+              variant={settings.language.startsWith(item.code) ? 'contained' : 'outlined'}
+              onClick={() => void update({ language: item.code })}
+              sx={{ borderRadius: 2, height: 30 }}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </Stack>
         <Typography variant="caption" color="text.secondary">
           正文字号：{settings.fontSize}px
         </Typography>
@@ -244,11 +264,62 @@ function GeneralTab(): React.ReactNode {
       </Box>
 
       <Box>
+        <SectionTitle>{t('settings.translate')}</SectionTitle>
+        <Stack sx={{ gap: 0.5 }}>
+          <Switch
+            checked={settings.translateEnabled}
+            onChange={(v) => void update({ translateEnabled: v })}
+            label={t('settings.translateEnable')}
+          />
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 0.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              {t('settings.translateTarget')}
+            </Typography>
+            <TextField
+              size="small"
+              value={settings.translateTarget}
+              onChange={(e) => void update({ translateTarget: e.target.value })}
+              placeholder="zh-CN"
+              sx={{ width: 120 }}
+            />
+          </Stack>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              {t('settings.translateEndpoint')}
+            </Typography>
+            <TextField
+              size="small"
+              fullWidth
+              value={settings.translateEndpoint}
+              onChange={(e) => void update({ translateEndpoint: e.target.value })}
+              placeholder="https://translate.googleapis.com/translate_a/single"
+              sx={{ mt: 0.75 }}
+            />
+          </Box>
+        </Stack>
+      </Box>
+
+      <Box>
         <SectionTitle>收取与通知</SectionTitle>
         <Stack sx={{ gap: 0.5 }}>
           <Switch checked={settings.notifications} onChange={(v) => void update({ notifications: v })} label="收到新邮件时显示桌面通知" />
           <Switch checked={settings.autoStartSync} onChange={(v) => void update({ autoStartSync: v })} label="启动时自动同步所有账户" />
           <Switch checked={settings.idleEnabled} onChange={(v) => void update({ idleEnabled: v })} label="IMAP 实时推送（IDLE，新邮件立即到达，重启后生效）" />
+          <Switch checked={settings.trayEnabled} onChange={(v) => void update({ trayEnabled: v })} label="显示系统托盘图标（含未读提示，重启后生效）" />
+          <Switch checked={settings.closeToTray} onChange={(v) => void update({ closeToTray: v })} label="关闭窗口时最小化到托盘（而不是退出程序）" />
+          <Switch checked={settings.openAtLogin} onChange={(v) => void update({ openAtLogin: v })} label="开机自动启动" />
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              发送后撤销窗口（秒，0 = 立即发送）
+            </Typography>
+            <TextField
+              size="small"
+              type="number"
+              value={settings.sendDelaySeconds}
+              onChange={(e) => void update({ sendDelaySeconds: Math.max(0, Number(e.target.value)) })}
+              sx={{ width: 96 }}
+            />
+          </Stack>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 1 }}>
             <Typography variant="caption" color="text.secondary">
               自动检查间隔（分钟）
@@ -268,6 +339,12 @@ function GeneralTab(): React.ReactNode {
         <SectionTitle>阅读</SectionTitle>
         <Stack sx={{ gap: 0.5 }}>
           <Switch checked={settings.showSnippet} onChange={(v) => void update({ showSnippet: v })} label="列表中显示邮件摘要" />
+          <Switch checked={settings.threadView} onChange={(v) => void update({ threadView: v })} label={t('settings.threadView')} />
+          <Switch
+            checked={settings.alwaysLoadImages}
+            onChange={(v) => void update({ alwaysLoadImages: v })}
+            label={t('settings.alwaysLoadImages')}
+          />
           <Switch checked={settings.confirmBeforeDelete} onChange={(v) => void update({ confirmBeforeDelete: v })} label="删除前弹出确认" />
         </Stack>
       </Box>
@@ -688,6 +765,110 @@ function AboutTab(): React.ReactNode {
         <br />
         创建时间：{accounts[0] ? formatFullDate(accounts[0].createdAt) : '—'}
       </Typography>
+    </Box>
+  )
+}
+
+function TemplatesTab(): React.ReactNode {
+  const theme = useTheme()
+  const templates = useApp((s) => s.templates)
+  const loadTemplates = useApp((s) => s.loadTemplates)
+  const pushToast = useApp((s) => s.pushToast)
+  const t = useT()
+  const [draft, setDraft] = useState<Template | null>(null)
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+        <SectionTitle>{t('settings.templates')}</SectionTitle>
+        <Box sx={{ flex: 1 }} />
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<AddIcon sx={{ fontSize: 15 }} />}
+          sx={{ borderRadius: 2, height: 30 }}
+          onClick={() => setDraft({ id: '', name: '新模板', subject: '', body: '', createdAt: 0 })}
+        >
+          {t('template.new')}
+        </Button>
+      </Box>
+
+      {templates.length ? (
+        templates.map((template) => (
+          <Paper
+            key={template.id}
+            elevation={0}
+            sx={{ p: 1.5, mb: 1.25, borderRadius: 2.5, bgcolor: alpha(theme.palette.text.primary, 0.03) }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{template.name}</Typography>
+              <Button size="small" variant="outlined" onClick={() => setDraft(template)} sx={{ borderRadius: 2, height: 26 }}>
+                {t('settings.edit')}
+              </Button>
+              <IconButton
+                size="small"
+                onClick={async () => {
+                  await api.templateDelete(template.id)
+                  await loadTemplates()
+                }}
+                aria-label="删除模板"
+                sx={{ color: 'error.main' }}
+              >
+                <DeleteIcon sx={{ fontSize: 17 }} />
+              </IconButton>
+            </Box>
+            {template.subject ? (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                主题：{template.subject}
+              </Typography>
+            ) : null}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, maxHeight: 40, overflow: 'hidden' }}>
+              {template.body.slice(0, 140)}
+            </Typography>
+          </Paper>
+        ))
+      ) : (
+        <Typography variant="caption" color="text.secondary">
+          {t('template.empty')}
+        </Typography>
+      )}
+
+      {draft ? (
+        <Modal
+          title={draft.id ? t('template.edit') : t('template.new')}
+          onClose={() => setDraft(null)}
+          width={620}
+          footer={
+            <Button
+              variant="contained"
+              onClick={async () => {
+                await api.templateSave(draft)
+                setDraft(null)
+                await loadTemplates()
+                pushToast('success', t('template.saved'))
+              }}
+            >
+              {t('settings.save')}
+            </Button>
+          }
+        >
+          <Field label={t('template.name')}>
+            <TextField fullWidth value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          </Field>
+          <Field label={t('template.subject')}>
+            <TextField fullWidth value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} />
+          </Field>
+          <Field label={t('template.body')}>
+            <TextField
+              fullWidth
+              multiline
+              minRows={8}
+              value={draft.body}
+              onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+            />
+          </Field>
+        </Modal>
+      ) : null}
     </Box>
   )
 }

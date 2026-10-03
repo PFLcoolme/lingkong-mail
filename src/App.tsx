@@ -3,6 +3,7 @@ import { Box, CssBaseline, ThemeProvider, alpha } from '@mui/material'
 import MailPlusIcon from '@mui/icons-material/MailOutlineRounded'
 import { useApp } from '@/store/app'
 import { api } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { buildTheme, type ThemeMode } from '@/theme'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
@@ -23,6 +24,7 @@ export default function App(): React.ReactNode {
   const composer = useApp((s) => s.composer)
   const openWizard = useApp((s) => s.openWizard)
   const settings = useApp((s) => s.settings)
+  const t = useT()
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches
   )
@@ -158,8 +160,8 @@ export default function App(): React.ReactNode {
             <Box sx={{ flex: 1, display: 'flex' }}>
               <EmptyState
                 icon={<MailPlusIcon sx={{ fontSize: 34, color: 'text.disabled' }} />}
-                title="还没有添加邮箱"
-                description="添加第一个邮箱账户后即可收取、撰写和管理邮件"
+                title={t('empty.noAccount')}
+                description={t('empty.noAccountHint')}
                 action={
                   <Box
                     onClick={openWizard}
@@ -175,7 +177,7 @@ export default function App(): React.ReactNode {
                       color: 'primary.contrastText'
                     }}
                   >
-                    添加邮箱账户
+                    {t('empty.addAccount')}
                   </Box>
                 }
               />

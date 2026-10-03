@@ -1,10 +1,17 @@
 import type { AppApi, PickedFile, TestResult } from '@shared/api'
-import type { Contact, MainEvent, MessageSummary } from '@shared/types'
+import type { Contact, MainEvent, MessageSummary, Template } from '@shared/types'
 
 type ExtraApi = {
   contactsSearch: (query: string, accountId?: string) => Promise<Contact[]>
   messageSummary: (id: string) => Promise<MessageSummary | null>
   messagesCount: (folderId: string) => Promise<number>
+  messageExport: (id: string) => Promise<string | null>
+  messagesExport: (ids: string[]) => Promise<{ dir: string; count: number } | null>
+  messagePrint: (id: string) => Promise<boolean>
+  templatesList: () => Promise<Template[]>
+  templateSave: (template: Partial<Template>) => Promise<Template>
+  templateDelete: (id: string) => Promise<void>
+  translateText: (input: { text: string; target: string; source?: string; endpoint?: string }) => Promise<string>
   folderRefreshStats: (folderId: string) => Promise<boolean>
   messagesLocalDelete: (ids: string[]) => Promise<void>
   appToast: (level: 'info' | 'success' | 'error', message: string) => Promise<void>

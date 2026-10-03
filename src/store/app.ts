@@ -1,8 +1,12 @@
 import { create } from 'zustand'
 import { api, onMainEvent, type PickedFile } from '@/lib/api'
 import { buildQuote, parseAddressInput } from '@/lib/format'
+import { translateStatic } from '@/lib/i18n'
 import type {
   Account,
+  OutboxItem,
+  SavedSearch,
+  SnoozedItem,
   AppSettings,
   Contact,
   Draft,
@@ -12,7 +16,8 @@ import type {
   MessageSummary,
   Rule,
   SearchHit,
-  SyncState
+  SyncState,
+  Template
 } from '@shared/types'
 
 export interface ComposerState {
@@ -24,6 +29,7 @@ export interface ComposerState {
   bcc: string
   subject: string
   text: string
+  html: string
   attachments: PickedFile[]
   inReplyTo: string
   references: string
@@ -50,7 +56,16 @@ const DEFAULT_SETTINGS: AppSettings = {
   markReadDelayMs: 800,
   language: 'zh-CN',
   transparentBackground: false,
-  idleEnabled: true
+  idleEnabled: true,
+  threadView: true,
+  translateEnabled: true,
+  translateTarget: 'zh-CN',
+  translateEndpoint: '',
+  trayEnabled: true,
+  alwaysLoadImages: false,
+  sendDelaySeconds: 10,
+  closeToTray: true,
+  openAtLogin: false
 }
 
 interface AppState {
@@ -58,6 +73,8 @@ interface AppState {
   accounts: Account[]
   folders: Folder[]
   messages: MessageSummary[]
+  hasMoreMessages: boolean
+  loadingMore: boolean
   activeAccountId: string
   activeFolderId: string
   selectedId: string | null
@@ -79,12 +96,20 @@ interface AppState {
   drafts: Draft[]
   contacts: Contact[]
   rules: Rule[]
+  templates: Template[]
+  outbox: OutboxItem[]
+  snoozed: SnoozedItem[]
+  savedSearches: SavedSearch[]
+  allowedImageSenders: string[]
+  translation: string
+  translating: boolean
 
   bootstrap: () => Promise<void>
   refreshAccounts: () => Promise<void>
   selectAccount: (id: string) => Promise<void>
   selectFolder: (id: string) => Promise<void>
   reloadMessages: () => Promise<void>
+  loadMoreMessages: () => Promise<void>
   openMessage: (id: string) => Promise<void>
   setFilterQuery: (value: string) => void
   toggleUnreadOnly: () => void
@@ -101,13 +126,26 @@ interface AppState {
   forwardMessage: () => void
   selectRelative: (delta: number) => void
   closeComposer: () => void
-  sendComposer: () => Promise<void>
+  sendComposer: (options?: { delaySeconds?: number; scheduledAt?: number }) => Promise<void>
   saveDraft: () => Promise<void>
   openDraft: (draft: Draft) => void
   deleteDraft: (id: string) => Promise<void>
   loadDrafts: () => Promise<void>
   loadContacts: () => Promise<void>
   loadRules: () => Promise<void>
+  loadTemplates: () => Promise<void>
+  loadOutbox: () => Promise<void>
+  loadSnoozed: () => Promise<void>
+  loadSavedSearches: () => Promise<void>
+  snoozeMessages: (ids: string[], wakeAt: number) => Promise<void>
+  wakeSnoozed: (messageId: string) => Promise<void>
+  cancelScheduledSend: (id: string) => Promise<void>
+  sendScheduledNow: (id: string) => Promise<void>
+  saveSearch: (name: string, query: string) => Promise<void>
+  removeSearch: (id: string) => Promise<void>
+  translateCurrent: () => Promise<void>
+  clearTranslation: () => void
+  allowSenderImages: (address: string) => void
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>
   openSettings: () => void
   closeSettings: () => void
@@ -115,6 +153,11 @@ interface AppState {
   closeWizard: () => void
   pushToast: (level: Toast['level'], message: string) => void
   dismissToast: (id: number) => void
+}
+
+function tr(key: string, vars?: Record<string, string | number>): string {
+  const lang = useApp.getState().settings.language?.startsWith('en') ? 'en' : 'zh-CN'
+  return translateStatic(key, lang, vars)
 }
 
 let toastSeq = 0
@@ -125,6 +168,8 @@ export const useApp = create<AppState>((set, get) => ({
   accounts: [],
   folders: [],
   messages: [],
+  hasMoreMessages: false,
+  loadingMore: false,
   activeAccountId: '',
   activeFolderId: '',
   selectedId: null,
@@ -146,6 +191,107 @@ export const useApp = create<AppState>((set, get) => ({
   drafts: [],
   contacts: [],
   rules: [],
+  templates: [],
+  outbox: [],
+  snoozed: [],
+  savedSearches: [],
+  allowedImageSenders: [],
+  translation: '',
+  translating: false,
+
+  async loadTemplates() {
+    set({ templates: await api.templatesList() })
+  },
+
+  async loadOutbox() {
+    set({ outbox: await api.outboxList() })
+  },
+
+  async loadSnoozed() {
+    set({ snoozed: await api.snoozeList() })
+  },
+
+  async loadSavedSearches() {
+    set({ savedSearches: await api.searchesList() })
+  },
+
+  async snoozeMessages(ids: string[], wakeAt: number) {
+    for (const id of ids) {
+      const target = get().messages.find((m) => m.id === id)
+      if (!target) continue
+      await api.snoozeAdd({
+        messageId: id,
+        accountId: target.accountId,
+        folderId: target.folderId,
+        wakeAt
+      })
+    }
+    await get().reloadMessages()
+    await get().loadSnoozed()
+    get().pushToast('info', '已设置稍后提醒')
+  },
+
+  async wakeSnoozed(messageId: string) {
+    await api.snoozeWake(messageId)
+    await get().reloadMessages()
+    await get().loadSnoozed()
+  },
+
+  async cancelScheduledSend(id: string) {
+    await api.outboxCancel(id)
+    await get().loadOutbox()
+    get().pushToast('info', '已取消发送')
+  },
+
+  async sendScheduledNow(id: string) {
+    await api.outboxSendNow(id)
+    await get().loadOutbox()
+    get().pushToast('success', '已立即发送')
+  },
+
+  async saveSearch(name: string, query: string) {
+    await api.searchSave({ name, query })
+    await get().loadSavedSearches()
+  },
+
+  async removeSearch(id: string) {
+    await api.searchDelete(id)
+    await get().loadSavedSearches()
+  },
+
+  async translateCurrent() {
+    const message = get().current
+    if (!message) return
+    if (get().translation) {
+      set({ translation: '' })
+      return
+    }
+    const settings = get().settings
+    const source = message.bodyText || message.snippet
+    if (!source.trim()) return
+    set({ translating: true })
+    try {
+      const result = await api.translateText({
+        text: source.slice(0, 20000),
+        target: settings.translateTarget || 'zh-CN',
+        endpoint: settings.translateEndpoint || undefined
+      })
+      set({ translation: result })
+    } catch (error) {
+      get().pushToast('error', error instanceof Error ? error.message : '翻译失败')
+    } finally {
+      set({ translating: false })
+    }
+  },
+
+  clearTranslation() {
+    set({ translation: '' })
+  },
+
+  allowSenderImages(address: string) {
+    if (!address || get().allowedImageSenders.includes(address)) return
+    set({ allowedImageSenders: [...get().allowedImageSenders, address] })
+  },
 
   async bootstrap() {
     const settings = await api.settingsGet()
@@ -153,6 +299,9 @@ export const useApp = create<AppState>((set, get) => ({
     document.documentElement.dataset.theme = resolveTheme(settings.theme)
     document.documentElement.style.fontSize = `${settings.fontSize}px`
     await get().refreshAccounts()
+    await get().loadSavedSearches()
+    await get().loadSnoozed()
+    await get().loadOutbox()
     onMainEvent((event: MainEvent) => handleEvent(event, set, get))
     set({ ready: true })
   },
@@ -187,24 +336,50 @@ export const useApp = create<AppState>((set, get) => ({
     if (!activeFolderId) return
     set({ loadingMessages: true })
     try {
+      const pageSize = 120
       const messages = await api.messagesList({
         accountId: activeAccountId,
         folderId: activeFolderId,
-        limit: 200,
+        limit: pageSize,
         offset: 0,
         unreadOnly,
         flaggedOnly: false,
         withAttachmentsOnly: withAttachments,
         search: filterQuery
       })
-      set({ messages })
+      set({ messages, hasMoreMessages: messages.length >= pageSize })
     } finally {
       set({ loadingMessages: false })
     }
   },
 
+  async loadMoreMessages() {
+    const state = get()
+    if (!state.hasMoreMessages || state.loadingMore || !state.activeFolderId) return
+    set({ loadingMore: true })
+    try {
+      const pageSize = 120
+      const more = await api.messagesList({
+        accountId: state.activeAccountId,
+        folderId: state.activeFolderId,
+        limit: pageSize,
+        offset: state.messages.length,
+        unreadOnly: state.unreadOnly,
+        flaggedOnly: false,
+        withAttachmentsOnly: state.withAttachments,
+        search: state.filterQuery
+      })
+      set({
+        messages: [...state.messages, ...more],
+        hasMoreMessages: more.length >= pageSize
+      })
+    } finally {
+      set({ loadingMore: false })
+    }
+  },
+
   async openMessage(id: string) {
-    set({ selectedId: id, loadingMessage: true })
+    set({ selectedId: id, loadingMessage: true, translation: '' })
     const message = await api.messageGet(id)
     set({ current: message, loadingMessage: false })
     const target = get().messages.find((m) => m.id === id)
@@ -267,7 +442,7 @@ export const useApp = create<AppState>((set, get) => ({
       const folders = await api.foldersList(activeAccountId)
       set({ folders })
       await get().reloadMessages()
-      get().pushToast('success', '同步完成')
+      get().pushToast('success', tr('toast.synced'))
     } catch (error) {
       get().pushToast('error', error instanceof Error ? error.message : '同步失败')
     }
@@ -288,7 +463,7 @@ export const useApp = create<AppState>((set, get) => ({
     await api.messagesMove(ids, path)
     set({ messages: get().messages.filter((m) => !ids.includes(m.id)) })
     if (ids.includes(get().selectedId ?? '')) set({ selectedId: null, current: null })
-    get().pushToast('success', '已移动邮件')
+    get().pushToast('success', tr('toast.moved'))
   },
 
   async remove(ids: string[]) {
@@ -299,7 +474,7 @@ export const useApp = create<AppState>((set, get) => ({
     await api.messagesDelete(ids)
     set({ messages: get().messages.filter((m) => !ids.includes(m.id)) })
     if (ids.includes(get().selectedId ?? '')) set({ selectedId: null, current: null })
-    get().pushToast('success', '已删除邮件')
+    get().pushToast('success', tr('toast.deleted'))
   },
 
   compose(options = {}) {
@@ -316,6 +491,7 @@ export const useApp = create<AppState>((set, get) => ({
         cc: '',
         bcc: '',
         subject: '',
+        html: '',
         attachments: [],
         inReplyTo: '',
         references: '',
@@ -374,26 +550,34 @@ export const useApp = create<AppState>((set, get) => ({
     set({ composer: null })
   },
 
-  async sendComposer() {
+  async sendComposer(options?: { delaySeconds?: number; scheduledAt?: number }) {
     const composer = get().composer
     if (!composer) return
-    await api.mailSend({
+    const result = await api.mailSend(
+      {
       accountId: composer.accountId,
       to: parseAddressInput(composer.to),
       cc: parseAddressInput(composer.cc),
       bcc: parseAddressInput(composer.bcc),
       subject: composer.subject,
       text: composer.text,
-      html: `<div style="white-space:pre-wrap">${escapeHtml(composer.text)}</div>`,
+      html: composer.html || `<div style="white-space:pre-wrap">${escapeHtml(composer.text)}</div>`,
       attachments: composer.attachments.map((a) => ({ filename: a.filename, path: a.path })),
       inReplyTo: composer.inReplyTo,
       references: composer.references,
-      saveToSent: true
-    })
+        saveToSent: true
+      },
+      options
+    )
     if (composer.draftId) await api.draftDelete(composer.draftId)
     set({ composer: null })
-    get().pushToast('success', '邮件已发送')
+    if (result.scheduled && result.id) {
+      get().pushToast('info', '邮件已排队，可在左侧「待发送」中撤销或立即发送')
+    } else {
+      get().pushToast('success', tr('toast.sent'))
+    }
     await get().loadDrafts()
+    await get().loadOutbox()
   },
 
   async saveDraft() {
@@ -407,7 +591,7 @@ export const useApp = create<AppState>((set, get) => ({
       bcc: composer.bcc,
       subject: composer.subject,
       bodyText: composer.text,
-      bodyHtml: '',
+      bodyHtml: composer.html || '',
       inReplyTo: composer.inReplyTo,
       references: composer.references,
       replyFolderId: composer.replyFolderId,
@@ -416,7 +600,7 @@ export const useApp = create<AppState>((set, get) => ({
     })
     set({ composer: { ...composer, draftId: draft.id } })
     await get().loadDrafts()
-    get().pushToast('info', '草稿已保存')
+    get().pushToast('info', tr('toast.draftSaved'))
   },
 
   openDraft(draft: Draft) {
@@ -430,6 +614,7 @@ export const useApp = create<AppState>((set, get) => ({
         bcc: draft.bcc,
         subject: draft.subject,
         text: draft.bodyText,
+        html: draft.bodyHtml || '',
         attachments: draft.attachments.map((path) => ({
           filename: path.split('/').pop() ?? path,
           path,
@@ -478,6 +663,7 @@ export const useApp = create<AppState>((set, get) => ({
     void get().loadDrafts()
     void get().loadContacts()
     void get().loadRules()
+    void get().loadTemplates()
   },
 
   closeSettings() {

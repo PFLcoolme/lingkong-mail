@@ -6,6 +6,7 @@ directories:
   buildResources: build
 files:
   - out/**/*
+  - build/**/*
   - package.json
 asar: true
 compression: maximum

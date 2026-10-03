@@ -13,5 +13,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
   markReadDelayMs: 800,
   language: 'zh-CN',
   transparentBackground: false,
-  idleEnabled: true
+  idleEnabled: true,
+  threadView: true,
+  translateEnabled: true,
+  translateTarget: 'zh-CN',
+  translateEndpoint: '',
+  trayEnabled: true,
+  alwaysLoadImages: false,
+  sendDelaySeconds: 10,
+  closeToTray: true,
+  openAtLogin: false
 }

@@ -1,5 +1,8 @@
 import type {
   Account,
+  OutboxItem,
+  SavedSearch,
+  SnoozedItem,
   AccountConfig,
   AccountCredentials,
   AppSettings,
@@ -69,7 +72,19 @@ export interface AppApi {
   attachmentOpen(attachmentId: string): Promise<void>
 
   /* ---------- 发送与草稿 ---------- */
-  mailSend(payload: SendPayload): Promise<void>
+  mailSend(
+    payload: SendPayload,
+    options?: { delaySeconds?: number; scheduledAt?: number }
+  ): Promise<{ scheduled: boolean; id?: string; sendAt?: number }>
+  outboxList(): Promise<OutboxItem[]>
+  outboxCancel(id: string): Promise<void>
+  outboxSendNow(id: string): Promise<void>
+  snoozeList(): Promise<SnoozedItem[]>
+  snoozeAdd(input: { messageId: string; accountId: string; folderId: string; wakeAt: number }): Promise<void>
+  snoozeWake(messageId: string): Promise<void>
+  searchesList(): Promise<SavedSearch[]>
+  searchSave(search: { id?: string; name: string; query: string }): Promise<SavedSearch>
+  searchDelete(id: string): Promise<void>
   draftsList(accountId: string): Promise<Draft[]>
   draftSave(draft: Partial<Draft>): Promise<Draft>
   draftDelete(id: string): Promise<void>

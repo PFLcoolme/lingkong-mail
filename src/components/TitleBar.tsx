@@ -17,6 +17,7 @@ import CropSquareRoundedIcon from '@mui/icons-material/CropSquareRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded'
 import { api } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { useApp } from '@/store/app'
 
 export default function TitleBar(): React.ReactNode {
@@ -27,6 +28,7 @@ export default function TitleBar(): React.ReactNode {
   const clearSearch = useApp((s) => s.clearSearch)
   const searching = useApp((s) => s.searching)
   const openSettings = useApp((s) => s.openSettings)
+  const t = useT()
   const [term, setTerm] = useState('')
   const [maximized, setMaximized] = useState(false)
   const timer = useRef<number | undefined>(undefined)
@@ -97,7 +99,7 @@ export default function TitleBar(): React.ReactNode {
           onDoubleClick={() => void api.windowAction('maximize')}
           sx={{ fontWeight: 650, letterSpacing: -0.2 }}
         >
-          空灵邮箱
+          {t('app.name')}
         </Typography>
       </Box>
 
@@ -125,13 +127,13 @@ export default function TitleBar(): React.ReactNode {
           <InputBase
             value={term}
             onChange={(e) => setTerm(e.target.value)}
-            placeholder="搜索全部邮件（主题 / 正文 / 发件人）"
+            placeholder={t('search.placeholder')}
             sx={{ flex: 1, fontSize: 13 }}
             inputProps={{ 'aria-label': '搜索邮件' }}
           />
           {searching ? (
             <Typography variant="caption" color="text.secondary">
-              搜索中…
+              {t('search.searching')}
             </Typography>
           ) : null}
           {term ? (
@@ -143,7 +145,7 @@ export default function TitleBar(): React.ReactNode {
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 168, justifyContent: 'flex-end' }}>
-        {controlButton(openSettings, '设置', <SettingsOutlinedIcon sx={{ fontSize: 17 }} />)}
+        {controlButton(openSettings, t('settings.title'), <SettingsOutlinedIcon sx={{ fontSize: 17 }} />)}
         <Box sx={{ width: 1, height: 18, bgcolor: theme.palette.divider, mx: 0.5 }} />
         {controlButton(() => void api.windowAction('minimize'), '最小化', <MinimizeRoundedIcon sx={{ fontSize: 16 }} />)}
         {controlButton(

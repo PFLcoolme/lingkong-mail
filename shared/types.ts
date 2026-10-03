@@ -123,6 +123,41 @@ export interface Contact {
   lastUsedAt: number
 }
 
+export type OutboxStatus = 'pending' | 'sending' | 'sent' | 'failed'
+
+export interface OutboxItem {
+  id: string
+  accountId: string
+  payload: SendPayload
+  sendAt: number
+  createdAt: number
+  status: OutboxStatus
+}
+
+export interface SnoozedItem {
+  id: string
+  messageId: string
+  accountId: string
+  folderId: string
+  wakeAt: number
+  createdAt: number
+}
+
+export interface SavedSearch {
+  id: string
+  name: string
+  query: string
+  createdAt: number
+}
+
+export interface Template {
+  id: string
+  name: string
+  subject: string
+  body: string
+  createdAt: number
+}
+
 export type RuleField = 'from' | 'to' | 'subject' | 'body'
 export type RuleOperator = 'contains' | 'notContains' | 'equals' | 'startsWith' | 'regex'
 export type RuleActionType = 'markRead' | 'flag' | 'move' | 'delete' | 'skipNotification'
@@ -238,6 +273,24 @@ export interface AppSettings {
   transparentBackground: boolean
   /** IMAP IDLE 实时推送（新邮件即时到达） */
   idleEnabled: boolean
+  /** 会话视图：同一主题的往来邮件折叠显示 */
+  threadView: boolean
+  /** 启用邮件自动翻译 */
+  translateEnabled: boolean
+  /** 翻译目标语言，如 zh-CN / en */
+  translateTarget: string
+  /** 自定义翻译服务地址（留空使用内置免费接口） */
+  translateEndpoint: string
+  /** 显示系统托盘图标（含未读提示） */
+  trayEnabled: boolean
+  /** 总是加载邮件中的远程图片（关闭隐私防护） */
+  alwaysLoadImages: boolean
+  /** 点击发送后的撤销窗口（秒，0 = 立即发送） */
+  sendDelaySeconds: number
+  /** 关闭主窗口时最小化到托盘而不是退出 */
+  closeToTray: boolean
+  /** 开机自动启动 */
+  openAtLogin: boolean
 }
 
 export interface ProviderPreset {

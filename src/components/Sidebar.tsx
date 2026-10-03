@@ -29,9 +29,16 @@ import SyncIcon from '@mui/icons-material/SyncRounded'
 import AddIcon from '@mui/icons-material/AddRounded'
 import ErrorIcon from '@mui/icons-material/ErrorOutlineRounded'
 import SettingsIcon from '@mui/icons-material/SettingsOutlined'
+import ScheduleSendIcon from '@mui/icons-material/ScheduleSendRounded'
+import SnoozeIcon from '@mui/icons-material/SnoozeRounded'
+import BookmarkIcon from '@mui/icons-material/BookmarkBorderRounded'
+import SendNowIcon from '@mui/icons-material/SendRounded'
+import WakeIcon from '@mui/icons-material/NotificationsActiveRounded'
+import CancelIcon from '@mui/icons-material/CloseRounded'
 import type { FolderType } from '@shared/types'
 import { useApp } from '@/store/app'
 import { Avatar } from './ui'
+import { useT } from '@/lib/i18n'
 
 const FOLDER_ICON: Record<FolderType, typeof InboxIcon> = {
   inbox: InboxIcon,
@@ -61,7 +68,18 @@ export default function Sidebar(): React.ReactNode {
   const drafts = useApp((s) => s.drafts)
   const openDraft = useApp((s) => s.openDraft)
   const loadDrafts = useApp((s) => s.loadDrafts)
+  const outbox = useApp((s) => s.outbox)
+  const snoozed = useApp((s) => s.snoozed)
+  const savedSearches = useApp((s) => s.savedSearches)
+  const loadOutbox = useApp((s) => s.loadOutbox)
+  const loadSnoozed = useApp((s) => s.loadSnoozed)
+  const cancelScheduledSend = useApp((s) => s.cancelScheduledSend)
+  const sendScheduledNow = useApp((s) => s.sendScheduledNow)
+  const wakeSnoozed = useApp((s) => s.wakeSnoozed)
+  const runSearch = useApp((s) => s.runSearch)
+  const removeSearch = useApp((s) => s.removeSearch)
 
+  const t = useT()
   const [accountsOpen, setAccountsOpen] = useState(true)
   const [otherOpen, setOtherOpen] = useState(true)
 
@@ -120,13 +138,13 @@ export default function Sidebar(): React.ReactNode {
           disabled={!accounts.length}
           sx={{ height: 36, borderRadius: 2.5 }}
         >
-          写邮件
+          {t('compose.write')}
         </Button>
       </Box>
 
       <Box sx={{ flex: 1, overflowY: 'auto', pb: 1 }}>
         {sectionHeader(
-          `账户 ${accounts.length}`,
+          `${t('sidebar.accounts')} ${accounts.length}`,
           accountsOpen,
           () => setAccountsOpen(!accountsOpen),
           <Tooltip title="添加账户" disableInteractive>
@@ -182,7 +200,7 @@ export default function Sidebar(): React.ReactNode {
           const isOther = group.type === 'other'
           return (
             <Box key={group.type} sx={{ mt: 0.5 }}>
-              {isOther ? sectionHeader('其他文件夹', otherOpen, () => setOtherOpen(!otherOpen)) : null}
+              {isOther ? sectionHeader(t('sidebar.otherFolders'), otherOpen, () => setOtherOpen(!otherOpen)) : null}
               <List dense disablePadding>
                 {group.items.map((folder) => {
                   const Icon = FOLDER_ICON[group.type]
@@ -238,9 +256,125 @@ export default function Sidebar(): React.ReactNode {
           )
         })}
 
+        {savedSearches.length ? (
+          <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
+            {sectionHeader('智能文件夹', true, () => undefined)}
+            <List dense disablePadding>
+              {savedSearches.map((search) => (
+                <ListItemButton
+                  key={search.id}
+                  onClick={() => void runSearch(search.query)}
+                  sx={{ py: 0.4, minHeight: 30 }}
+                >
+                  <ListItemIcon sx={{ minWidth: 30 }}>
+                    <BookmarkIcon sx={{ fontSize: 16 }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={search.name}
+                    slotProps={{
+                      primary: {
+                        sx: { fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                      }
+                    }}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void removeSearch(search.id)
+                    }}
+                    aria-label="删除智能文件夹"
+                    sx={{ p: 0.25 }}
+                  >
+                    <CancelIcon sx={{ fontSize: 13 }} />
+                  </IconButton>
+                </ListItemButton>
+              ))}
+            </List>
+          </Box>
+        ) : null}
+
+        {outbox.length ? (
+          <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
+            {sectionHeader(`待发送 ${outbox.length}`, true, () => void loadOutbox())}
+            <List dense disablePadding>
+              {outbox.map((item) => (
+                <ListItemButton key={item.id} sx={{ py: 0.4, minHeight: 30 }}>
+                  <ListItemIcon sx={{ minWidth: 30 }}>
+                    <ScheduleSendIcon sx={{ fontSize: 16 }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.payload.subject || '(无主题)'}
+                    secondary={new Date(item.sendAt).toLocaleString()}
+                    slotProps={{
+                      primary: {
+                        sx: { fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                      },
+                      secondary: { sx: { fontSize: 10.5 } }
+                    }}
+                  />
+                  <Tooltip title="立即发送" disableInteractive>
+                    <IconButton
+                      size="small"
+                      onClick={() => void sendScheduledNow(item.id)}
+                      aria-label="立即发送"
+                      sx={{ p: 0.25 }}
+                    >
+                      <SendNowIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="撤销发送" disableInteractive>
+                    <IconButton
+                      size="small"
+                      onClick={() => void cancelScheduledSend(item.id)}
+                      aria-label="撤销发送"
+                      sx={{ p: 0.25, color: 'error.main' }}
+                    >
+                      <CancelIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                </ListItemButton>
+              ))}
+            </List>
+          </Box>
+        ) : null}
+
+        {snoozed.length ? (
+          <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
+            {sectionHeader(`稍后提醒 ${snoozed.length}`, true, () => void loadSnoozed())}
+            <List dense disablePadding>
+              {snoozed.map((item) => (
+                <ListItemButton key={item.id} sx={{ py: 0.4, minHeight: 30 }}>
+                  <ListItemIcon sx={{ minWidth: 30 }}>
+                    <SnoozeIcon sx={{ fontSize: 16 }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={new Date(item.wakeAt).toLocaleString()}
+                    secondary="唤醒时间"
+                    slotProps={{
+                      primary: { sx: { fontSize: 12 } },
+                      secondary: { sx: { fontSize: 10.5 } }
+                    }}
+                  />
+                  <Tooltip title="现在就提醒我" disableInteractive>
+                    <IconButton
+                      size="small"
+                      onClick={() => void wakeSnoozed(item.messageId)}
+                      aria-label="立即唤醒"
+                      sx={{ p: 0.25 }}
+                    >
+                      <WakeIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                </ListItemButton>
+              ))}
+            </List>
+          </Box>
+        ) : null}
+
         {drafts.length ? (
           <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
-            {sectionHeader(`本地草稿 ${drafts.length}`, true, () => void loadDrafts())}
+            {sectionHeader(`${t('sidebar.drafts')} ${drafts.length}`, true, () => void loadDrafts())}
             <List dense disablePadding>
               {drafts.slice(0, 5).map((draft) => (
                 <ListItemButton key={draft.id} onClick={() => openDraft(draft)} sx={{ py: 0.4, minHeight: 30 }}>
@@ -278,10 +412,10 @@ export default function Sidebar(): React.ReactNode {
           disabled={busy || !accounts.length}
           sx={{ borderRadius: 2, height: 28 }}
         >
-          同步
+          {t('sidebar.sync')}
         </Button>
         <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-          {unreadTotal ? `${unreadTotal} 封未读` : '全部已读'}
+          {unreadTotal ? t('sidebar.unread', { n: unreadTotal }) : t('sidebar.allRead')}
         </Typography>
         <Tooltip title="设置" disableInteractive>
           <IconButton size="small" onClick={openSettings} aria-label="设置">

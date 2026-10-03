@@ -138,6 +138,42 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS outbox (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  send_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_send_at ON outbox(send_at);
+
+CREATE TABLE IF NOT EXISTS snoozed (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL UNIQUE,
+  account_id TEXT NOT NULL,
+  folder_id TEXT NOT NULL,
+  wake_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_snoozed_wake ON snoozed(wake_at);
+
+CREATE TABLE IF NOT EXISTS saved_searches (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  query TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_templates_created ON templates(created_at);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
   subject, body, participants,
   content='messages',

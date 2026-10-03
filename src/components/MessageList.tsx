@@ -14,6 +14,9 @@ import {
   alpha,
   useTheme
 } from '@mui/material'
+import FileDownloadIcon from '@mui/icons-material/FileDownloadRounded'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMoreRounded'
+import ExpandLessIcon from '@mui/icons-material/ExpandLessRounded'
 import StarIcon from '@mui/icons-material/StarRounded'
 import StarBorderIcon from '@mui/icons-material/StarBorderRounded'
 import AttachFileIcon from '@mui/icons-material/AttachFileRounded'
@@ -26,6 +29,8 @@ import type { MessageSummary, SearchHit } from '@shared/types'
 import { useApp } from '@/store/app'
 import { Avatar, EmptyState, Spinner } from './ui'
 import { formatDate, shortAddress } from '@/lib/format'
+import { useT } from '@/lib/i18n'
+import { api } from '@/lib/api'
 
 export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'column' }): React.ReactNode {
   const theme = useTheme()
@@ -50,14 +55,76 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
   const selectAccount = useApp((s) => s.selectAccount)
   const selectFolder = useApp((s) => s.selectFolder)
   const showSnippet = useApp((s) => s.settings.showSnippet)
+  const hasMore = useApp((s) => s.hasMoreMessages)
+  const loadingMore = useApp((s) => s.loadingMore)
+  const loadMoreMessages = useApp((s) => s.loadMoreMessages)
+  const saveSearch = useApp((s) => s.saveSearch)
 
+  const threadView = useApp((s) => s.settings.threadView)
   const [checked, setChecked] = useState<string[]>([])
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const t = useT()
+
   useEffect(() => setChecked([]), [messages, searchResults])
 
   const rows: MessageSummary[] = useMemo(
     () => (searchResults ? (searchResults as MessageSummary[]) : messages),
     [searchResults, messages]
   )
+
+  const threadKey = (subject: string): string => {
+    let key = subject
+    for (let i = 0; i < 3; i += 1) {
+      key = key.replace(/^\s*(re|fwd?|fw|aw|回复|转发)\s*[:：]\s*/i, '')
+    }
+    return key.trim().toLowerCase() || '(无主题)'
+  }
+
+  const threads = useMemo(() => {
+    if (!threadView || searchResults) return null
+    const groups = new Map<string, MessageSummary[]>()
+    for (const item of messages) {
+      const key = threadKey(item.subject)
+      const list = groups.get(key) ?? []
+      list.push(item)
+      groups.set(key, list)
+    }
+    return [...groups.values()]
+  }, [messages, threadView, searchResults])
+
+  const threadHeadIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (threads) {
+      for (const group of threads) {
+        if (group.length > 1 && group[0]) ids.add(group[0].id)
+      }
+    }
+    return ids
+  }, [threads])
+
+  const displayRows: MessageSummary[] = useMemo(() => {
+    if (!threads) return rows
+    const out: MessageSummary[] = []
+    for (const group of threads) {
+      if (!group.length) continue
+      out.push(group[0])
+      if (expanded[threadKey(group[0].subject)]) out.push(...group.slice(1))
+    }
+    return out
+  }, [rows, threads, expanded])
+
+  function toggleThread(id: string): void {
+    const item = messages.find((m) => m.id === id)
+    if (!item) return
+    const key = threadKey(item.subject)
+    setExpanded({ ...expanded, [key]: !expanded[key] })
+  }
+
+  async function exportSelected(): Promise<void> {
+    const result = await api.messagesExport(checked)
+    if (result) useApp.getState().pushToast('success', t('toast.exported', { n: result.count }))
+    setChecked([])
+  }
 
   async function openHit(hit: SearchHit): Promise<void> {
     await selectAccount(hit.accountId)
@@ -87,7 +154,27 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip size="small" icon={<SearchIcon sx={{ fontSize: 14 }} />} label={`“${searchTerm}” ${searchResults.length} 条`} />
             <Box sx={{ flex: 1 }} />
-            <Chip size="small" variant="outlined" label="返回文件夹" onClick={clearSearch} sx={{ cursor: 'pointer' }} />
+            <Chip
+              size="small"
+              variant="outlined"
+              label="保存为智能文件夹"
+              onClick={() => {
+                const name = window.prompt('给这个智能文件夹起个名字', searchTerm)
+                if (name) void saveSearch(name, searchTerm)
+              }}
+              sx={{ cursor: 'pointer' }}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label="保存为智能文件夹"
+              onClick={() => {
+                const name = window.prompt('给这个智能文件夹起个名字', searchTerm)
+                if (name) void saveSearch(name, searchTerm)
+              }}
+              sx={{ cursor: 'pointer' }}
+            />
+            <Chip size="small" variant="outlined" label={t('list.backToFolder')} onClick={clearSearch} sx={{ cursor: 'pointer' }} />
           </Box>
         ) : (
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -108,12 +195,12 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
               <InputBase
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                placeholder="在当前文件夹中过滤"
+                placeholder={t('list.filter')}
                 sx={{ flex: 1, fontSize: 13 }}
                 inputProps={{ 'aria-label': '过滤当前文件夹' }}
               />
             </Box>
-            <Tooltip title="仅未读" disableInteractive>
+            <Tooltip title={t('list.unreadOnly')} disableInteractive>
               <IconButton
                 size="small"
                 onClick={toggleUnreadOnly}
@@ -163,7 +250,7 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
           }}
         >
           <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-            已选 {checked.length}
+            {t('list.selected', { n: checked.length })}
           </Typography>
           <Tooltip title="标记为已读" disableInteractive>
             <IconButton size="small" onClick={() => void markSeen(checked, true)} aria-label="标记已读">
@@ -194,6 +281,11 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
             ))}
           </Select>
           <Box sx={{ flex: 1 }} />
+          <Tooltip title={t('list.export')} disableInteractive>
+            <IconButton size="small" onClick={() => void exportSelected()} aria-label={t('list.export')}>
+              <FileDownloadIcon sx={{ fontSize: 17 }} />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="删除" disableInteractive>
             <IconButton
               size="small"
@@ -207,20 +299,38 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
         </Box>
       ) : null}
 
-      <Box sx={{ flex: 1, overflowY: 'auto' }}>
+      <Box
+        sx={{ flex: 1, overflowY: 'auto' }}
+        onScroll={(event) => {
+          const el = event.currentTarget
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) void loadMoreMessages()
+        }}
+      >
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
             <Spinner size={20} />
           </Box>
         ) : rows.length ? (
-          rows.map((item) => {
+          displayRows.map((item) => {
             const hit = item as SearchHit
             const selected = item.id === selectedId
             return (
               <Box
                 key={item.id}
                 className={`msg-row ${selected ? 'selected' : ''} ${item.seen ? '' : 'unread'}`}
-                onClick={() => (searchResults ? void openHit(hit) : void openMessage(item.id))}
+                onClick={() => {
+                  if (searchResults) {
+                    void openHit(hit)
+                    return
+                  }
+                  const isHead = threadHeadIds.has(item.id)
+                  const isOpen = isHead && expanded[threadKey(item.subject)]
+                  if (isHead && !isOpen) {
+                    toggleThread(item.id)
+                    return
+                  }
+                  void openMessage(item.id)
+                }}
                 sx={{
                   display: 'flex',
                   gap: 1.25,
@@ -298,6 +408,22 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
                   ) : null}
                 </Box>
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                  {threadHeadIds.has(item.id) ? (
+                    <Chip
+                      size="small"
+                      icon={
+                        expanded[threadKey(item.subject)] ? (
+                          <ExpandLessIcon sx={{ fontSize: 13 }} />
+                        ) : (
+                          <ExpandMoreIcon sx={{ fontSize: 13 }} />
+                        )
+                      }
+                      label={t('list.threadCount', {
+                        n: threads?.find((g) => g[0]?.id === item.id)?.length ?? 0
+                      })}
+                      sx={{ height: 18, fontSize: 10.5 }}
+                    />
+                  ) : null}
                   <IconButton
                     size="small"
                     aria-label="切换星标"
@@ -326,17 +452,27 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
         ) : (
           <EmptyState
             icon={<MailIcon sx={{ fontSize: 30, color: 'text.disabled' }} />}
-            title={searchResults ? '没有匹配的邮件' : '这里还没有邮件'}
-            description={searchResults ? '换个关键词试试' : '点击左下角“同步”从服务器收取邮件'}
+            title={searchResults ? t('list.noMatch') : t('list.empty')}
+            description={searchResults ? '换个关键词试试' : t('list.emptyHint')}
           />
         )}
       </Box>
+
+      {hasMore || loadingMore ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 1.25 }}>
+          {loadingMore ? <Spinner size={16} /> : (
+            <Typography variant="caption" color="text.secondary">
+              向下滚动加载更多
+            </Typography>
+          )}
+        </Box>
+      ) : null}
 
       {!searchResults ? (
         <Box sx={{ px: 2, py: 1 }}>
           <Divider sx={{ mb: 1 }} />
           <Typography variant="caption" color="text.secondary">
-            共 {messages.length} 封邮件
+            {t('list.count', { n: messages.length })}
           </Typography>
         </Box>
       ) : null}

@@ -1,19 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import DOMPurify from 'dompurify'
 import {
   Alert,
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   Paper,
+  Menu,
+  MenuItem,
   Stack,
+  TextField,
   Tooltip,
   Typography,
   alpha,
   useTheme
 } from '@mui/material'
+import CloseIcon from '@mui/icons-material/CloseRounded'
+import DownloadIcon from '@mui/icons-material/DownloadRounded'
+import PrintIcon from '@mui/icons-material/PrintRounded'
+import SnoozeIcon from '@mui/icons-material/SnoozeRounded'
+import TranslateIcon from '@mui/icons-material/TranslateRounded'
 import ReplyIcon from '@mui/icons-material/ReplyRounded'
 import ReplyAllIcon from '@mui/icons-material/ReplyAllRounded'
 import ForwardIcon from '@mui/icons-material/ForwardRounded'
@@ -25,7 +36,8 @@ import AttachFileIcon from '@mui/icons-material/AttachFileRounded'
 import PrivacyTipIcon from '@mui/icons-material/PrivacyTipOutlined'
 import { useApp } from '@/store/app'
 import { api } from '@/lib/api'
-import { Avatar, EmptyState, Spinner } from './ui'
+import { Avatar, EmptyState, Field, Spinner } from './ui'
+import { useT } from '@/lib/i18n'
 import { formatFullDate, formatSize, shortAddress } from '@/lib/format'
 
 const ALLOWED_URI = /^(?:(?:https?|mailto|file|data|cid):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
@@ -41,6 +53,32 @@ export default function ReadingPane(): React.ReactNode {
   const remove = useApp((s) => s.remove)
   const settings = useApp((s) => s.settings)
   const [showRemoteImages, setShowRemoteImages] = useState(false)
+  const [preview, setPreview] = useState<{ filename: string; path: string; mimeType: string } | null>(null)
+  const [snoozeAnchor, setSnoozeAnchor] = useState<HTMLElement | null>(null)
+  const snoozeMessages = useApp((s) => s.snoozeMessages)
+  const [snoozeCustomOpen, setSnoozeCustomOpen] = useState(false)
+  const [snoozeValue, setSnoozeValue] = useState<string>(() =>
+    toInputValue(new Date(Date.now() + 3600_000))
+  )
+  const allowedSenders = useApp((s) => s.allowedImageSenders)
+  const allowSenderImages = useApp((s) => s.allowSenderImages)
+  const alwaysLoadImages = useApp((s) => s.settings.alwaysLoadImages)
+  const pushToast = useApp((s) => s.pushToast)
+  const translation = useApp((s) => s.translation)
+  const translating = useApp((s) => s.translating)
+  const translateCurrent = useApp((s) => s.translateCurrent)
+  const clearTranslation = useApp((s) => s.clearTranslation)
+  const translateEnabled = useApp((s) => s.settings.translateEnabled)
+  const t = useT()
+
+  const messageId = message?.id
+  useEffect(() => {
+    setShowRemoteImages(false)
+  }, [messageId])
+
+  const senderAddress = message?.from?.[0]?.address ?? ''
+  const allowImages =
+    showRemoteImages || alwaysLoadImages || (!!senderAddress && allowedSenders.includes(senderAddress))
 
   const html = useMemo(() => {
     if (!message?.bodyHtml) return ''
@@ -56,11 +94,11 @@ export default function ReadingPane(): React.ReactNode {
       FORBID_TAGS: ['script', 'style', 'form', 'input', 'iframe', 'object', 'embed', 'link', 'meta'],
       FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'srcset']
     })
-    if (!showRemoteImages) {
+    if (!allowImages) {
       clean = clean.replace(/(<img\b[^>]*?)\ssrc=(["'])https?:/gi, '$1 data-blocked-src=$2https:')
     }
     return clean
-  }, [message, showRemoteImages])
+  }, [message, allowImages])
 
   if (loading) {
     return (
@@ -79,6 +117,12 @@ export default function ReadingPane(): React.ReactNode {
         />
       </Box>
     )
+  }
+
+  async function exportEml(): Promise<void> {
+    if (!message) return
+    const path = await api.messageExport(message.id)
+    if (path) pushToast('success', `已导出：${path}`)
   }
 
   const remoteBlocked = /data-blocked-src=/i.test(html)
@@ -123,8 +167,8 @@ export default function ReadingPane(): React.ReactNode {
           boxShadow: 'none'
         }}
       >
-        <Tooltip title="标为未读" disableInteractive>
-          <IconButton size="small" onClick={() => void markSeen([message.id], false)} aria-label="标为未读">
+        <Tooltip title={t('read.markUnread')} disableInteractive>
+          <IconButton size="small" onClick={() => void markSeen([message.id], false)} aria-label={t('read.markUnread')}>
             <MailUnreadIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Tooltip>
@@ -138,9 +182,74 @@ export default function ReadingPane(): React.ReactNode {
           </IconButton>
         </Tooltip>
         <Box sx={{ flex: 1 }} />
-        {actionButton('回复', <ReplyIcon sx={{ fontSize: 16 }} />, () => replyTo(false))}
-        {actionButton('全部回复', <ReplyAllIcon sx={{ fontSize: 16 }} />, () => replyTo(true))}
-        {actionButton('转发', <ForwardIcon sx={{ fontSize: 16 }} />, () => forwardMessage())}
+        {actionButton(t('compose.reply'), <ReplyIcon sx={{ fontSize: 16 }} />, () => replyTo(false))}
+        {actionButton(t('compose.replyAll'), <ReplyAllIcon sx={{ fontSize: 16 }} />, () => replyTo(true))}
+        {actionButton(t('compose.forward'), <ForwardIcon sx={{ fontSize: 16 }} />, () => forwardMessage())}
+        <Tooltip title={t('read.exportEml')} disableInteractive>
+          <IconButton size="small" onClick={() => void exportEml()} aria-label={t('read.exportEml')}>
+            <DownloadIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="稍后提醒" disableInteractive>
+          <IconButton
+            size="small"
+            onClick={(event) => setSnoozeAnchor(event.currentTarget)}
+            aria-label="稍后提醒"
+          >
+            <SnoozeIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+        <Menu
+          anchorEl={snoozeAnchor}
+          open={Boolean(snoozeAnchor)}
+          onClose={() => setSnoozeAnchor(null)}
+        >
+          {SNOOZE_OPTIONS.map((option) => (
+            <MenuItem
+              key={option.label}
+              sx={{ fontSize: 13 }}
+              onClick={() => {
+                setSnoozeAnchor(null)
+                void snoozeMessages([message.id], option.at())
+                useApp.setState({ selectedId: null, current: null })
+              }}
+            >
+              {option.label}
+            </MenuItem>
+          ))}
+          <MenuItem
+            sx={{ fontSize: 13 }}
+            onClick={() => {
+              setSnoozeAnchor(null)
+              setSnoozeValue(toInputValue(new Date(Date.now() + 3600_000)))
+              setSnoozeCustomOpen(true)
+            }}
+          >
+            自定义时间…
+          </MenuItem>
+        </Menu>
+        {translateEnabled ? (
+          <Tooltip title={translating ? t('read.translating') : translation ? t('read.original') : t('read.translate')} disableInteractive>
+            <IconButton
+              size="small"
+              onClick={() => void translateCurrent()}
+              disabled={translating}
+              aria-label={t('read.translate')}
+              sx={{ color: translation ? 'primary.main' : 'text.secondary' }}
+            >
+              <TranslateIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        ) : null}
+        <Tooltip title={t('read.print')} disableInteractive>
+          <IconButton
+            size="small"
+            onClick={() => void api.messagePrint(message.id)}
+            aria-label={t('read.print')}
+          >
+            <PrintIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="删除" disableInteractive>
           <IconButton
             size="small"
@@ -175,20 +284,58 @@ export default function ReadingPane(): React.ReactNode {
             severity="info"
             icon={<PrivacyTipIcon fontSize="small" />}
             action={
-              <Button size="small" onClick={() => setShowRemoteImages(true)} sx={{ borderRadius: 2 }}>
-                显示图片
-              </Button>
+              <Stack direction="row" spacing={1}>
+                {senderAddress ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => allowSenderImages(senderAddress)}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    {t('read.alwaysAllowSender')}
+                  </Button>
+                ) : null}
+                <Button size="small" onClick={() => setShowRemoteImages(true)} sx={{ borderRadius: 2 }}>
+                  {t('read.showImages')}
+                </Button>
+              </Stack>
             }
             sx={{ mb: 2, borderRadius: 2.5, py: 0.5 }}
           >
-            为保护隐私，已阻止加载邮件中的远程图片
+            {t('read.remoteImages')}
           </Alert>
         ) : null}
 
-        {message.bodyHtml ? (
+        {translation ? (
+          <Box>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
+              <Chip size="small" label={t('read.translated')} />
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={clearTranslation}
+                sx={{ borderRadius: 2, height: 28 }}
+              >
+                {t('read.original')}
+              </Button>
+            </Stack>
+            <Typography
+              component="pre"
+              sx={{
+                m: 0,
+                whiteSpace: 'pre-wrap',
+                fontSize: settings.fontSize,
+                lineHeight: 1.75,
+                fontFamily: 'inherit'
+              }}
+            >
+              {translation}
+            </Typography>
+          </Box>
+        ) : message.bodyHtml ? (
           <iframe
             title="邮件正文"
-            sandbox=""
+            sandbox="allow-same-origin"
             srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent;color:${textColor};font-family:'Inter','Noto Sans SC',system-ui,sans-serif;font-size:${settings.fontSize}px;line-height:1.7;word-break:break-word}img{max-width:100%;height:auto}a{color:#3f6fd8}blockquote{border-left:3px solid rgba(140,140,150,.5);padding-left:10px;margin:8px 0;opacity:.85}table{max-width:100%}</style></head><body>${html}</body></html>`}
             style={{ width: '100%', height: '56vh', border: 'none' }}
           />
@@ -211,7 +358,7 @@ export default function ReadingPane(): React.ReactNode {
           <Box sx={{ mt: 3 }}>
             <Divider sx={{ mb: 1.5 }} />
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
-              附件（{message.attachments.length}）
+              {t('read.attachments', { n: message.attachments.length })}
             </Typography>
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
               {message.attachments
@@ -239,16 +386,24 @@ export default function ReadingPane(): React.ReactNode {
                         {formatSize(att.size)}
                       </Typography>
                     </Box>
+                    {previewable(att.mimeType) ? (
+                      <Chip
+                        size="small"
+                        label={t('read.preview')}
+                        onClick={() => setPreview({ filename: att.filename, path: att.path, mimeType: att.mimeType })}
+                        sx={{ height: 22, fontSize: 11.5, cursor: 'pointer' }}
+                      />
+                    ) : null}
                     <Chip
                       size="small"
-                      label="打开"
+                      label={t('read.open')}
                       onClick={() => void api.attachmentOpen(att.id)}
                       sx={{ height: 22, fontSize: 11.5, cursor: 'pointer' }}
                     />
                     <Chip
                       size="small"
                       variant="outlined"
-                      label="另存为"
+                      label={t('read.saveAs')}
                       onClick={() => void api.attachmentSaveAs(att.id)}
                       sx={{ height: 22, fontSize: 11.5, cursor: 'pointer' }}
                     />
@@ -258,7 +413,139 @@ export default function ReadingPane(): React.ReactNode {
           </Box>
         ) : null}
       </Box>
+
+      <Dialog open={snoozeCustomOpen} onClose={() => setSnoozeCustomOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 600 }}>选择提醒时间</DialogTitle>
+        <DialogContent dividers>
+          <Field label="提醒时间">
+            <TextField
+              fullWidth
+              type="datetime-local"
+              value={snoozeValue}
+              onChange={(e) => setSnoozeValue(e.target.value)}
+              slotProps={{ htmlInput: { step: 60 } }}
+            />
+          </Field>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {[
+              { label: '1 小时后', at: () => Date.now() + 3600_000 },
+              { label: '今晚 20:00', at: () => atHour(0, 20) },
+              { label: '明天 9:00', at: () => atHour(1, 9) },
+              { label: '下周一 9:00', at: () => atHour(((8 - new Date().getDay()) % 7) || 7, 9) }
+            ].map((item) => (
+              <Chip
+                key={item.label}
+                label={item.label}
+                onClick={() => setSnoozeValue(toInputValue(new Date(item.at())))}
+                sx={{ cursor: 'pointer', borderRadius: 2 }}
+              />
+            ))}
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+            当前选择：{formatScheduleTime(snoozeValue)}
+          </Typography>
+        </DialogContent>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end', px: 2.5, py: 1.75 }}>
+          <Button variant="outlined" onClick={() => setSnoozeCustomOpen(false)}>
+            取消
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              const time = new Date(snoozeValue).getTime()
+              if (Number.isNaN(time)) {
+                pushToast('error', '请选择有效的时间')
+                return
+              }
+              setSnoozeCustomOpen(false)
+              void snoozeMessages([message.id], time)
+              useApp.setState({ selectedId: null, current: null })
+            }}
+          >
+            确定
+          </Button>
+        </Stack>
+      </Dialog>
+
+      <Dialog
+        open={!!preview}
+        onClose={() => setPreview(null)}
+        maxWidth="lg"
+        fullWidth
+        sx={{ '& .MuiDialog-paper': { height: '86vh', borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 14 }}>
+          <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {preview?.filename}
+          </Box>
+          <IconButton size="small" onClick={() => setPreview(null)} aria-label="关闭预览">
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent
+          dividers
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(theme.palette.text.primary, 0.03) }}
+        >
+          {preview ? (
+            preview.mimeType.startsWith('image/') ? (
+              <Box
+                component="img"
+                src={fileUrl(preview.path)}
+                alt={preview.filename}
+                sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 1 }}
+              />
+            ) : preview.mimeType === 'application/pdf' ? (
+              <iframe src={fileUrl(preview.path)} title={preview.filename} style={{ width: '100%', height: '100%', border: 'none' }} />
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                该类型不支持应用内预览，请点「打开」用系统程序查看
+              </Typography>
+            )
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Box>
   )
 }
 
+function previewable(mime: string): boolean {
+  return mime.startsWith('image/') || mime === 'application/pdf'
+}
+
+function fileUrl(path: string): string {
+  return `file://${encodeURI(path)}`
+}
+
+function atHour(dayOffset: number, hour: number): number {
+  const date = new Date()
+  date.setDate(date.getDate() + dayOffset)
+  date.setHours(hour, 0, 0, 0)
+  return date.getTime()
+}
+
+function nextWeekdayAt(weekday: number, hour: number): number {
+  const date = new Date()
+  const diff = (weekday - date.getDay() + 7) % 7 || 7
+  return atHour(diff, hour)
+}
+
+const SNOOZE_OPTIONS: { label: string; at: () => number }[] = [
+  { label: '1 小时后', at: () => Date.now() + 3600_000 },
+  { label: '3 小时后', at: () => Date.now() + 3 * 3600_000 },
+  { label: '今晚 20:00', at: () => atHour(0, 20) },
+  { label: '明天 9:00', at: () => atHour(1, 9) },
+  { label: '下周一 9:00', at: () => nextWeekdayAt(1, 9) }
+]
+
+function toInputValue(date: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`
+}
+
+function formatScheduleTime(value: string): string {
+  const time = new Date(value).getTime()
+  if (Number.isNaN(time)) return '未选择'
+  return new Date(time).toLocaleString()
+}

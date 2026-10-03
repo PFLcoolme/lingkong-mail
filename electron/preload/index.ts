@@ -17,7 +17,11 @@ import type {
   Rule,
   SearchHit,
   SearchQuery,
-  SendPayload
+  OutboxItem,
+  SavedSearch,
+  SendPayload,
+  SnoozedItem,
+  Template
 } from '@shared/types'
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
@@ -54,7 +58,17 @@ const api: AppApi = {
   attachmentSaveAs: (attachmentId) => invoke<string | null>('attachment:save-as', attachmentId),
   attachmentOpen: (attachmentId) => invoke<void>('attachment:open', attachmentId),
 
-  mailSend: (payload) => invoke<void>('mail:send', payload),
+  mailSend: (payload, options) =>
+    invoke<{ scheduled: boolean; id?: string; sendAt?: number }>('mail:send', payload, options),
+  outboxList: () => invoke<OutboxItem[]>('outbox:list'),
+  outboxCancel: (id) => invoke<void>('outbox:cancel', id),
+  outboxSendNow: (id) => invoke<void>('outbox:send-now', id),
+  snoozeList: () => invoke<SnoozedItem[]>('snooze:list'),
+  snoozeAdd: (input) => invoke<void>('snooze:add', input),
+  snoozeWake: (messageId) => invoke<void>('snooze:wake', messageId),
+  searchesList: () => invoke<SavedSearch[]>('searches:list'),
+  searchSave: (search) => invoke<SavedSearch>('search:save', search),
+  searchDelete: (id) => invoke<void>('search:delete', id),
   draftsList: (accountId) => invoke<Draft[]>('drafts:list', accountId),
   draftSave: (draft) => invoke<Draft>('draft:save', draft),
   draftDelete: (id) => invoke<void>('draft:delete', id),
@@ -102,6 +116,14 @@ const extra = {
   folderRefreshStats: (folderId: string) => invoke<boolean>('folder:refresh-stats', folderId),
   messagesLocalDelete: (ids: string[]) => invoke<void>('messages:local-delete', ids),
   messagesCount: (folderId: string) => invoke<number>('messages:count', folderId),
+  messageExport: (id: string) => invoke<string | null>('message:export', id),
+  messagesExport: (ids: string[]) => invoke<{ dir: string; count: number } | null>('messages:export', ids),
+  messagePrint: (id: string) => invoke<boolean>('message:print', id),
+  templatesList: () => invoke<Template[]>('templates:list'),
+  templateSave: (template: Partial<Template>) => invoke<Template>('template:save', template),
+  templateDelete: (id: string) => invoke<void>('template:delete', id),
+  translateText: (input: { text: string; target: string; source?: string; endpoint?: string }) =>
+    invoke<string>('translate:text', input),
   appToast: (level: 'info' | 'success' | 'error', message: string) => invoke<void>('app:toast', level, message)
 }
 
