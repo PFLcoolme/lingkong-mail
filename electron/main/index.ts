@@ -2,7 +2,7 @@ import { app, ipcMain, nativeTheme } from 'electron'
 import { join } from 'node:path'
 import { initDatabase } from './services/db'
 import { settingsGet } from './services/accounts'
-import { setEventSink, syncAllAccounts } from './services/sync'
+import { setEventSink, startIdleAll, syncAllAccounts } from './services/sync'
 import { registerAccountHandlers } from './ipc/accounts'
 import { registerMailHandlers } from './ipc/mail'
 import { registerMiscHandlers, DEFAULT_SETTINGS } from './ipc/misc'
@@ -75,6 +75,11 @@ void app.whenReady().then(() => {
   scheduleAutoSync()
   ipcMain.on('settings:changed', () => scheduleAutoSync())
   if (settings.autoStartSync) {
-    setTimeout(() => void syncAllAccounts(), 1200)
+    setTimeout(() => {
+      void syncAllAccounts()
+      void startIdleAll()
+    }, 1500)
+  } else {
+    setTimeout(() => void startIdleAll(), 2000)
   }
 })

@@ -425,3 +425,74 @@ export async function syncAllAccounts(): Promise<void> {
     await syncAccount(account.id).catch(() => undefined)
   }
 }
+
+interface IdleWatcher {
+  stopped: boolean
+  client: ImapFlow | null
+}
+
+const idleWatchers = new Map<string, IdleWatcher>()
+
+/** 为 IMAP 账户开启 IDLE 监听，新邮件即时推送（失败自动退化为定时轮询） */
+export async function startIdle(accountId: string): Promise<void> {
+  stopIdle(accountId)
+  const account = getAccount(accountId)
+  if (!account || !account.enabled || account.protocol !== 'imap') return
+  const watcher: IdleWatcher = { stopped: false, client: null }
+  idleWatchers.set(accountId, watcher)
+
+  void (async () => {
+    while (!watcher.stopped) {
+      try {
+        const current = getAccount(accountId)
+        if (!current || !current.enabled) return
+        const client = await clientFor(current)
+        watcher.client = client
+        const inbox = listFolders(accountId).find((f) => f.type === 'inbox') ?? listFolders(accountId)[0]
+        if (!inbox) return
+        await client.mailboxOpen(inbox.path)
+        const folderId = inbox.id
+        const onChange = (): void => {
+          void syncFolder(accountId, folderId).catch(() => undefined)
+        }
+        client.on('exists', onChange)
+        client.on('expunge', onChange)
+        while (!watcher.stopped) {
+          await client.idle()
+          onChange()
+        }
+      } catch (error) {
+        if (watcher.stopped) return
+        console.warn('[IDLE] 监听中断，30 秒后重连', error)
+        await new Promise((resolve) => setTimeout(resolve, 30000))
+      } finally {
+        try {
+          await watcher.client?.logout()
+        } catch {
+          /* ignore */
+        }
+        watcher.client = null
+      }
+    }
+  })()
+}
+
+export function stopIdle(accountId: string): void {
+  const watcher = idleWatchers.get(accountId)
+  if (!watcher) return
+  watcher.stopped = true
+  idleWatchers.delete(accountId)
+  try {
+    void watcher.client?.logout()
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function startIdleAll(): Promise<void> {
+  const settings = settingsGet<{ idleEnabled?: boolean }>('app', {})
+  if (settings.idleEnabled === false) return
+  for (const account of listAccounts().filter((a) => a.enabled && a.protocol === 'imap')) {
+    await startIdle(account.id).catch(() => undefined)
+  }
+}

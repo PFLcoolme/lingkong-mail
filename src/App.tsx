@@ -47,10 +47,73 @@ export default function App(): React.ReactNode {
   const theme = useMemo(() => buildTheme(mode), [mode])
   const [maximized, setMaximized] = useState(false)
   const glassWindow = settings.transparentBackground === true
+  const paneBottom = settings.readPanePosition === 'bottom'
 
   useEffect(() => {
     void api.windowIsMaximized().then(setMaximized)
     return api.onWindowState(setMaximized)
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null
+      const typing =
+        !!target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      const mod = event.ctrlKey || event.metaKey
+      const state = useApp.getState()
+
+      if (mod && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        state.compose({ mode: 'new' })
+        return
+      }
+      if (mod && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        document.querySelector<HTMLInputElement>('input[aria-label="搜索邮件"]')?.focus()
+        return
+      }
+      if (typing || state.composer || state.settingsOpen || state.wizardOpen) return
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (state.selectedId) {
+          event.preventDefault()
+          void state.remove([state.selectedId])
+        }
+        return
+      }
+      if (event.key === 'r' && state.current) {
+        event.preventDefault()
+        state.replyTo(false)
+        return
+      }
+      if (event.key === 'f' && state.current) {
+        event.preventDefault()
+        state.forwardMessage()
+        return
+      }
+      if (event.key === 'j' || event.key === 'ArrowDown') {
+        event.preventDefault()
+        state.selectRelative(1)
+        return
+      }
+      if (event.key === 'k' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        state.selectRelative(-1)
+        return
+      }
+      if (event.key.toLowerCase() === 'u' && state.selectedId) {
+        event.preventDefault()
+        void state.markSeen([state.selectedId], false)
+        return
+      }
+      if (event.key.toLowerCase() === 's' && state.selectedId) {
+        event.preventDefault()
+        void state.flag([state.selectedId], !state.messages.find((m) => m.id === state.selectedId)?.flagged)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   return (
@@ -80,10 +143,17 @@ export default function App(): React.ReactNode {
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <Sidebar />
           {accounts.length ? (
-            <>
-              <MessageList />
-              <ReadingPane />
-            </>
+            paneBottom ? (
+              <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <MessageList layout="column" />
+                <ReadingPane />
+              </Box>
+            ) : (
+              <>
+                <MessageList layout="row" />
+                <ReadingPane />
+              </>
+            )
           ) : (
             <Box sx={{ flex: 1, display: 'flex' }}>
               <EmptyState

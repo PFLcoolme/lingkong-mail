@@ -27,7 +27,7 @@ import { useApp } from '@/store/app'
 import { Avatar, EmptyState, Spinner } from './ui'
 import { formatDate, shortAddress } from '@/lib/format'
 
-export default function MessageList(): React.ReactNode {
+export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'column' }): React.ReactNode {
   const theme = useTheme()
   const messages = useApp((s) => s.messages)
   const loading = useApp((s) => s.loadingMessages)
@@ -69,12 +69,14 @@ export default function MessageList(): React.ReactNode {
     <Paper
       elevation={0}
       sx={{
-        width: 404,
+        width: layout === 'row' ? 404 : '100%',
+        height: layout === 'row' ? '100%' : '46%',
         flexShrink: 0,
         borderRadius: 0,
         borderTop: 'none',
         borderLeft: 'none',
-        borderBottom: 'none',
+        borderBottom: layout === 'row' ? 'none' : `1px solid ${theme.palette.divider}`,
+        borderRight: layout === 'row' ? `1px solid ${theme.palette.divider}` : 'none',
         boxShadow: 'none',
         display: 'flex',
         flexDirection: 'column'

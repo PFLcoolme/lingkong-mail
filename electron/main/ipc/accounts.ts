@@ -16,7 +16,7 @@ import { testSmtp } from '../services/smtp'
 import { testPop3 } from '../services/pop3'
 import { testEws, guessEwsUrl } from '../services/ews'
 import { listFolders } from '../services/folders'
-import { syncAccount } from '../services/sync'
+import { startIdle, stopIdle, syncAccount } from '../services/sync'
 import { setFlag, refreshFolderStats } from '../services/messages'
 import { createImapClient } from '../services/imap'
 
@@ -76,12 +76,15 @@ export function registerAccountHandlers(): void {
   })
 
   handle('accounts:remove', async (_event, id: string) => {
+    stopIdle(id)
     deleteAccount(id)
     return true
   })
 
   handle('accounts:set-enabled', async (_event, id: string, enabled: boolean) => {
     updateAccount(id, { enabled })
+    if (enabled) await startIdle(id)
+    else stopIdle(id)
     return true
   })
 

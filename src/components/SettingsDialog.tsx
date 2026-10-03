@@ -248,6 +248,7 @@ function GeneralTab(): React.ReactNode {
         <Stack sx={{ gap: 0.5 }}>
           <Switch checked={settings.notifications} onChange={(v) => void update({ notifications: v })} label="收到新邮件时显示桌面通知" />
           <Switch checked={settings.autoStartSync} onChange={(v) => void update({ autoStartSync: v })} label="启动时自动同步所有账户" />
+          <Switch checked={settings.idleEnabled} onChange={(v) => void update({ idleEnabled: v })} label="IMAP 实时推送（IDLE，新邮件立即到达，重启后生效）" />
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 1 }}>
             <Typography variant="caption" color="text.secondary">
               自动检查间隔（分钟）

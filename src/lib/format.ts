@@ -67,6 +67,25 @@ export function shortAddress(list: { name?: string; address: string }[]): string
   return list.map((a) => a.name || a.address).join('、')
 }
 
+/** 构造回复/转发时引用的原文 */
+export function buildQuote(
+  body: string,
+  from: { name?: string; address: string }[],
+  date: number,
+  subject: string
+): string {
+  return [
+    '',
+    '',
+    '---------- 原始邮件 ----------',
+    `发件人: ${shortAddress(from)}`,
+    `时间: ${formatFullDate(date)}`,
+    `主题: ${subject}`,
+    '',
+    body ?? ''
+  ].join('\n')
+}
+
 export function parseAddressInput(input: string): string[] {
   return input
     .split(/[,;，；\s]+/)

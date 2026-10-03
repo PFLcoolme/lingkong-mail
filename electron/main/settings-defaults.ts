@@ -12,5 +12,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoStartSync: true,
   markReadDelayMs: 800,
   language: 'zh-CN',
-  transparentBackground: false
+  transparentBackground: false,
+  idleEnabled: true
 }

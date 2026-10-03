@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api, onMainEvent, type PickedFile } from '@/lib/api'
+import { buildQuote, parseAddressInput } from '@/lib/format'
 import type {
   Account,
   AppSettings,
@@ -48,7 +49,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoStartSync: true,
   markReadDelayMs: 800,
   language: 'zh-CN',
-  transparentBackground: false
+  transparentBackground: false,
+  idleEnabled: true
 }
 
 interface AppState {
@@ -95,6 +97,9 @@ interface AppState {
   moveTo: (ids: string[], path: string) => Promise<void>
   remove: (ids: string[]) => Promise<void>
   compose: (options?: Partial<ComposerState>) => void
+  replyTo: (all?: boolean) => void
+  forwardMessage: () => void
+  selectRelative: (delta: number) => void
   closeComposer: () => void
   sendComposer: () => Promise<void>
   saveDraft: () => Promise<void>
@@ -287,6 +292,10 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async remove(ids: string[]) {
+    if (get().settings.confirmBeforeDelete) {
+      const label = ids.length > 1 ? `这 ${ids.length} 封邮件` : '这封邮件'
+      if (!window.confirm(`确定删除${label}吗？`)) return
+    }
     await api.messagesDelete(ids)
     set({ messages: get().messages.filter((m) => !ids.includes(m.id)) })
     if (ids.includes(get().selectedId ?? '')) set({ selectedId: null, current: null })
@@ -294,28 +303,71 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   compose(options = {}) {
-    const { activeAccountId, accounts, current } = get()
+    const { activeAccountId, accounts } = get()
+    const accountId = options.accountId ?? activeAccountId ?? accounts[0]?.id ?? ''
+    const account = accounts.find((a) => a.id === accountId)
+    const signature = account?.signature?.trim() ? `\n\n-- \n${account.signature.trim()}` : ''
+    const body = options.text ? `${options.text.replace(/\s+$/, '')}${signature}` : signature
     set({
       composer: {
-        accountId: options.accountId ?? activeAccountId ?? accounts[0]?.id ?? '',
+        accountId,
         mode: 'new',
         to: '',
         cc: '',
         bcc: '',
         subject: '',
-        text: '',
         attachments: [],
         inReplyTo: '',
         references: '',
         replyFolderId: '',
         replyUid: 0,
         showCc: false,
-        ...options
+        ...options,
+        text: body
       }
     })
-    if (current && options.mode === 'reply') {
-      // 引用原文占位由组件处理
-    }
+  },
+
+  replyTo(all = false) {
+    const message = get().current
+    if (!message) return
+    const recipients = all ? [...message.from, ...message.to] : message.from
+    get().compose({
+      mode: all ? 'replyAll' : 'reply',
+      accountId: message.accountId,
+      to: recipients.map((a) => a.address).join(', '),
+      subject: /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`,
+      text: buildQuote(message.bodyText, message.from, message.date, message.subject),
+      inReplyTo: message.messageId,
+      references: `${message.headers?.references ?? ''} ${message.messageId}`.trim(),
+      replyFolderId: message.folderId,
+      replyUid: message.uid
+    })
+  },
+
+  forwardMessage() {
+    const message = get().current
+    if (!message) return
+    get().compose({
+      mode: 'forward',
+      accountId: message.accountId,
+      subject: /^fwd:/i.test(message.subject) ? message.subject : `Fwd: ${message.subject}`,
+      text: buildQuote(message.bodyText, message.from, message.date, message.subject),
+      attachments: message.attachments.map((a) => ({
+        filename: a.filename,
+        path: a.path,
+        size: a.size,
+        mimeType: a.mimeType
+      }))
+    })
+  },
+
+  selectRelative(delta: number) {
+    const { messages, selectedId, openMessage } = get()
+    if (!messages.length) return
+    const index = messages.findIndex((m) => m.id === selectedId)
+    const next = index < 0 ? 0 : Math.min(messages.length - 1, Math.max(0, index + delta))
+    void openMessage(messages[next].id)
   },
 
   closeComposer() {
@@ -325,7 +377,6 @@ export const useApp = create<AppState>((set, get) => ({
   async sendComposer() {
     const composer = get().composer
     if (!composer) return
-    const { parseAddressInput } = await import('@/lib/format')
     await api.mailSend({
       accountId: composer.accountId,
       to: parseAddressInput(composer.to),

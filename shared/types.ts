@@ -236,6 +236,8 @@ export interface AppSettings {
   language: string
   /** 毛玻璃透明背景（个别 Linux 合成器下关闭可避免窗口发黑） */
   transparentBackground: boolean
+  /** IMAP IDLE 实时推送（新邮件即时到达） */
+  idleEnabled: boolean
 }
 
 export interface ProviderPreset {

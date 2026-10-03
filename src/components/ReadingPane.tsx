@@ -34,7 +34,8 @@ export default function ReadingPane(): React.ReactNode {
   const theme = useTheme()
   const message = useApp((s) => s.current)
   const loading = useApp((s) => s.loadingMessage)
-  const compose = useApp((s) => s.compose)
+  const replyTo = useApp((s) => s.replyTo)
+  const forwardMessage = useApp((s) => s.forwardMessage)
   const markSeen = useApp((s) => s.markSeen)
   const flag = useApp((s) => s.flag)
   const remove = useApp((s) => s.remove)
@@ -137,55 +138,9 @@ export default function ReadingPane(): React.ReactNode {
           </IconButton>
         </Tooltip>
         <Box sx={{ flex: 1 }} />
-        {actionButton(
-          '回复',
-          <ReplyIcon sx={{ fontSize: 16 }} />,
-          () =>
-            compose({
-              mode: 'reply',
-              accountId: message.accountId,
-              to: message.from.map((a) => a.address).join(', '),
-              subject: /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`,
-              text: quote(message.bodyText, message.from, message.date, message.subject),
-              inReplyTo: message.messageId,
-              references: `${message.headers?.references ?? ''} ${message.messageId}`.trim(),
-              replyFolderId: message.folderId,
-              replyUid: message.uid
-            })
-        )}
-        {actionButton(
-          '全部回复',
-          <ReplyAllIcon sx={{ fontSize: 16 }} />,
-          () =>
-            compose({
-              mode: 'replyAll',
-              accountId: message.accountId,
-              to: [...message.from, ...message.to].map((a) => a.address).join(', '),
-              subject: /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`,
-              text: quote(message.bodyText, message.from, message.date, message.subject),
-              inReplyTo: message.messageId,
-              references: `${message.headers?.references ?? ''} ${message.messageId}`.trim(),
-              replyFolderId: message.folderId,
-              replyUid: message.uid
-            })
-        )}
-        {actionButton(
-          '转发',
-          <ForwardIcon sx={{ fontSize: 16 }} />,
-          () =>
-            compose({
-              mode: 'forward',
-              accountId: message.accountId,
-              subject: /^fwd:/i.test(message.subject) ? message.subject : `Fwd: ${message.subject}`,
-              text: quote(message.bodyText, message.from, message.date, message.subject),
-              attachments: message.attachments.map((a) => ({
-                filename: a.filename,
-                path: a.path,
-                size: a.size,
-                mimeType: a.mimeType
-              }))
-            })
-        )}
+        {actionButton('回复', <ReplyIcon sx={{ fontSize: 16 }} />, () => replyTo(false))}
+        {actionButton('全部回复', <ReplyAllIcon sx={{ fontSize: 16 }} />, () => replyTo(true))}
+        {actionButton('转发', <ForwardIcon sx={{ fontSize: 16 }} />, () => forwardMessage())}
         <Tooltip title="删除" disableInteractive>
           <IconButton
             size="small"
@@ -307,15 +262,3 @@ export default function ReadingPane(): React.ReactNode {
   )
 }
 
-function quote(body: string, from: { name?: string; address: string }[], date: number, subject: string): string {
-  return [
-    '',
-    '',
-    '---------- 原始邮件 ----------',
-    `发件人: ${shortAddress(from)}`,
-    `时间: ${formatFullDate(date)}`,
-    `主题: ${subject}`,
-    '',
-    body ?? ''
-  ].join('\n')
-}
