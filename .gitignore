@@ -6,3 +6,6 @@ dist/
 .idea/
 .codebuddy/
 build/icon.icns
+
+# 官网：只在本地维护，不推送到仓库
+website/
