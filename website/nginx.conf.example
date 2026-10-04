@@ -1,0 +1,40 @@
+# 空灵邮箱官网的 nginx 站点配置示例
+# 放置位置：/etc/nginx/conf.d/kongling-mail.conf 或 /etc/nginx/sites-available/ 下并软链启用
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    # 有域名时换成你的域名，例如 server_name kongling.example.com;
+    # 用 IP 直接访问时保持 _ 即可
+    server_name _;
+
+    root /var/www/kongling-mail;
+    index index.html;
+
+    charset utf-8;
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # 静态资源缓存一周
+    location ~* \.(css|js|svg|png|jpg|jpeg|webp|ico|woff2?)$ {
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+
+    # 安全相关响应头
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+}
+
+# ── 若之后要启用 HTTPS（需要域名已解析到本机）────────────────
+# 推荐用 certbot 自动申请并改写上面的 server 块：
+#   apt-get install -y certbot python3-certbot-nginx
+#   certbot --nginx -d kongling.example.com
