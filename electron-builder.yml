@@ -15,7 +15,7 @@ linux:
   category: Network;Email;
   desktop:
     entry:
-      MimeType: "x-scheme-handler/mailto;" 
+      MimeType: "x-scheme-handler/mailto;"
   maintainer: cool
   icon: build/icon.png
   synopsis: 本地桌面邮箱管理客户端
@@ -24,13 +24,22 @@ linux:
     - target: AppImage
       arch:
         - x64
-        - arm64
     - target: deb
       arch:
         - x64
-        - arm64
 appImage:
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  # 资产名必须与 latest-linux.yml 中记录的一致，自动更新才能定位到安装包；
+  # 用中文 productName 会让下载链接变成一长串百分号编码，故固定为英文名
+  artifactName: kongling-mail-${version}-${arch}.${ext}
+deb:
+  artifactName: kongling-mail-${version}-${arch}.${ext}
+# electron-updater 通过这里生成 app-update.yml / latest-linux.yml
+publish:
+  provider: github
+  owner: PFLcoolme
+  repo: lingkong-mail
+  releaseType: release
+# 原生模块（better-sqlite3）由本机或 CI 显式跑 electron-rebuild 处理，不在打包时重编译
 npmRebuild: false
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

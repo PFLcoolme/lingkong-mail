@@ -23,6 +23,7 @@ import type {
   SavedSearch,
   SendPayload,
   SnoozedItem,
+  UpdateState,
   StatsOverview,
   Template
 } from '@shared/types'
@@ -94,6 +95,10 @@ const api: AppApi = {
   securitySetPassword: (previous, next) => invoke<boolean>('security:set-password', previous, next),
   securityClear: (previous) => invoke<boolean>('security:clear', previous),
   appVersion: () => invoke<string>('app:version'),
+  updateState: () => invoke<UpdateState>('update:state'),
+  updateCheck: () => invoke<UpdateState>('update:check'),
+  updateDownload: () => invoke<UpdateState>('update:download'),
+  updateInstall: () => invoke<boolean>('update:install'),
   backupCreate: () => invoke<{ dir: string; size: number } | null>('backup:create'),
   backupRestore: () => invoke<boolean>('backup:restore'),
   openPath: (path) => invoke<void>('app:open-path', path),

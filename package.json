@@ -1,7 +1,7 @@
 {
   "name": "kongling-mail",
   "productName": "空灵邮箱",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "适用于 Linux 的本地桌面邮箱管理客户端",
   "main": "out/main/index.js",
   "author": "cool",
@@ -25,6 +25,7 @@
     "@mui/utils": "^9.4.0",
     "better-sqlite3": "^13.0.3",
     "dompurify": "^3.4.16",
+    "electron-updater": "^6.8.9",
     "imapflow": "^2.2.1",
     "lucide-react": "^0.549.0",
     "mailparser": "^3.9.33",

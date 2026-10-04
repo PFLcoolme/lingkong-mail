@@ -6,6 +6,8 @@ import { setEventSink, startIdleAll, syncAllAccounts } from './services/sync'
 import { registerAccountHandlers } from './ipc/accounts'
 import { registerMailHandlers } from './ipc/mail'
 import { registerMiscHandlers, DEFAULT_SETTINGS } from './ipc/misc'
+import { registerUpdateHandlers } from './ipc/update'
+import { scheduleUpdateCheck, setUpdateSink } from './services/update'
 import { createMainWindow, getMainWindow, loadRenderer } from './window'
 import { refreshTray, setupTray } from './tray'
 import { startScheduler } from './scheduler'
@@ -94,9 +96,11 @@ void app.whenReady().then(() => {
   registerAccountHandlers()
   registerMailHandlers()
   registerMiscHandlers()
+  registerUpdateHandlers()
   const settings = { ...DEFAULT_SETTINGS, ...settingsGet<Partial<typeof DEFAULT_SETTINGS>>('app', {}) }
   nativeTheme.themeSource = settings.theme === 'system' ? 'system' : settings.theme
   setEventSink(pushToRenderer)
+  setUpdateSink(pushToRenderer)
   const window = createMainWindow()
   loadRenderer(window)
   scheduleAutoSync()
@@ -119,4 +123,7 @@ void app.whenReady().then(() => {
   } else {
     setTimeout(() => void startIdleAll(), 2000)
   }
+
+  // 启动后静默检查一次更新（仅打包环境生效）
+  scheduleUpdateCheck()
 })

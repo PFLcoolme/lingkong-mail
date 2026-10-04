@@ -3,6 +3,7 @@ import type {
   OutboxItem,
   SavedSearch,
   SnoozedItem,
+  UpdateState,
   AccountConfig,
   AccountCredentials,
   AppSettings,
@@ -115,6 +116,10 @@ export interface AppApi {
   securitySetPassword(previous: string, next: string): Promise<boolean>
   securityClear(previous: string): Promise<boolean>
   appVersion(): Promise<string>
+  updateState(): Promise<UpdateState>
+  updateCheck(): Promise<UpdateState>
+  updateDownload(): Promise<UpdateState>
+  updateInstall(): Promise<boolean>
   backupCreate(): Promise<{ dir: string; size: number } | null>
   backupRestore(): Promise<boolean>
   openPath(path: string): Promise<void>

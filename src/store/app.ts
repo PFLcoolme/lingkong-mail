@@ -18,6 +18,7 @@ import type {
   Rule,
   SearchHit,
   SyncState,
+  UpdateState,
   Template
 } from '@shared/types'
 
@@ -110,6 +111,7 @@ interface AppState {
   locked: boolean
   lockChecked: boolean
   lockEnabled: boolean
+  updateState: UpdateState
   translation: string
   translating: boolean
 
@@ -217,6 +219,7 @@ export const useApp = create<AppState>((set, get) => ({
   locked: false,
   lockChecked: false,
   lockEnabled: false,
+  updateState: { status: 'idle' },
   translation: '',
   translating: false,
 
@@ -832,6 +835,10 @@ function handleEvent(event: MainEvent, set: SetState, get: () => AppState): void
     }
     case 'lock-now': {
       if (get().lockEnabled) set({ locked: true, translation: '' })
+      break
+    }
+    case 'update-state': {
+      set({ updateState: event.payload })
       break
     }
     case 'compose-mailto': {

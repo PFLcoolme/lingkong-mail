@@ -5,6 +5,7 @@ import {
   Chip,
   Divider,
   IconButton,
+  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -27,6 +28,7 @@ import FileIcon from '@mui/icons-material/InsertDriveFileRounded'
 import OpenIcon from '@mui/icons-material/OpenInNewRounded'
 import JumpIcon from '@mui/icons-material/SubdirectoryArrowRightRounded'
 import BackupIcon from '@mui/icons-material/BackupRounded'
+import UpdateIcon from '@mui/icons-material/SystemUpdateAltRounded'
 import RestoreIcon from '@mui/icons-material/SettingsBackupRestoreRounded'
 import DeleteIcon from '@mui/icons-material/DeleteOutlineRounded'
 import PersonAddIcon from '@mui/icons-material/PersonAddRounded'
@@ -40,7 +42,8 @@ import type {
   RuleField,
   RuleOperator,
   StatsOverview,
-  Template
+  Template,
+  UpdateState
 } from '@shared/types'
 import { api, BUILD_TIME } from '@/lib/api'
 import { useApp } from '@/store/app'
@@ -797,11 +800,25 @@ function ContactsTab(): React.ReactNode {
 function AboutTab(): React.ReactNode {
   const accounts = useApp((s) => s.accounts)
   const pushToast = useApp((s) => s.pushToast)
+  const update = useApp((s) => s.updateState)
   const [version, setVersion] = useState('')
 
   useEffect(() => {
     void api.appVersion().then(setVersion)
+    void api.updateState().then((state) => useApp.setState({ updateState: state }))
   }, [])
+
+  const updateBusy = update.status === 'checking' || update.status === 'downloading'
+  const updateLabel: Record<UpdateState['status'], string> = {
+    idle: '检查更新',
+    checking: '正在检查更新…',
+    'not-available': '已是最新版本',
+    available: `发现新版本 v${update.version ?? ''}`,
+    downloading: `正在下载… ${update.percent ?? 0}%`,
+    downloaded: `新版本 v${update.version ?? ''} 已就绪`,
+    error: `检查更新失败：${update.message ?? ''}`
+  }
+
   return (
     <Box>
       <SectionTitle>空灵邮箱</SectionTitle>
@@ -813,16 +830,46 @@ function AboutTab(): React.ReactNode {
         {BUILD_TIME ? ` · 构建于 ${new Date(BUILD_TIME).toLocaleString()}` : ''}
       </Typography>
       <Stack spacing={1.25}>
-        <Button
-          variant="outlined"
-          sx={{ justifyContent: 'flex-start', borderRadius: 2 }}
-          onClick={async () => {
-            const version = await api.appVersion()
-            pushToast('info', `当前版本 ${version}`)
-          }}
-        >
-          查看版本号
-        </Button>
+        <Box>
+          <Button
+            variant="outlined"
+            startIcon={<UpdateIcon sx={{ fontSize: 16 }} />}
+            sx={{ justifyContent: 'flex-start', borderRadius: 2, width: '100%' }}
+            disabled={updateBusy}
+            onClick={() => void api.updateCheck()}
+          >
+            {updateLabel[update.status]}
+          </Button>
+          {update.status === 'downloading' ? (
+            <LinearProgress
+              variant="determinate"
+              value={update.percent ?? 0}
+              sx={{ mt: 1, borderRadius: 1, height: 6 }}
+            />
+          ) : null}
+          {update.status === 'available' ? (
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<UpdateIcon sx={{ fontSize: 15 }} />}
+              sx={{ mt: 1, borderRadius: 2 }}
+              onClick={() => void api.updateDownload()}
+            >
+              下载 v{update.version}
+            </Button>
+          ) : null}
+          {update.status === 'downloaded' ? (
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              sx={{ mt: 1, borderRadius: 2 }}
+              onClick={() => void api.updateInstall()}
+            >
+              重启并安装 v{update.version}
+            </Button>
+          ) : null}
+        </Box>
         <Button
           variant="outlined"
           startIcon={<FolderIcon sx={{ fontSize: 16 }} />}

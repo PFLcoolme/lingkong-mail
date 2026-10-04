@@ -290,8 +290,27 @@ export interface SyncState {
   fetched: number
 }
 
+/** 自动更新状态（主进程维护，通过 update-state 事件推送给界面） */
+export interface UpdateState {
+  status:
+    | 'idle'
+    | 'checking'
+    | 'available'
+    | 'not-available'
+    | 'downloading'
+    | 'downloaded'
+    | 'error'
+  /** 远端或本地版本号 */
+  version?: string
+  /** 下载进度百分比（0-100） */
+  percent?: number
+  /** 出错时的说明 */
+  message?: string
+}
+
 export type MainEvent =
   | { type: 'sync-state'; payload: SyncState }
+  | { type: 'update-state'; payload: UpdateState }
   | { type: 'messages-changed'; payload: { accountId: string; folderId: string } }
   | { type: 'folders-changed'; payload: { accountId: string } }
   | { type: 'accounts-changed'; payload: null }
