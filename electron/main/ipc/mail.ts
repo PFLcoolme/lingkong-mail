@@ -29,7 +29,7 @@ function escapeHtml(input: string): string {
     }
   })
 }
-import type { Draft, ListQuery, SearchQuery, SendPayload } from '@shared/types'
+import type { Draft, Label, ListQuery, SearchQuery, SendPayload } from '@shared/types'
 import { handle } from './common'
 import { getAccount, getAccountRow, getSecrets } from '../services/accounts'
 import {
@@ -47,6 +47,13 @@ import { appendToSent, buildRawMessage, sendMail } from '../services/smtp'
 import { getDb, parseJson } from '../services/db'
 import { recordAddresses } from '../services/contacts'
 import { getAttPath } from '../services/attachment-lookup'
+import {
+  applyLabelToMessages,
+  deleteLabel,
+  labelsOfMessages,
+  listLabels,
+  saveLabel
+} from '../services/labels'
 import { buildEml, emlFilename } from '../services/eml'
 import { enqueue, listOutbox, removeOutboxItem } from '../services/outbox'
 import { listSnoozed, snoozeMessage, wakeMessage } from '../services/snooze'
@@ -295,6 +302,25 @@ export function registerMailHandlers(): void {
     deleteSavedSearch(id)
     return true
   })
+
+  handle('labels:list', () => listLabels())
+
+  handle('label:save', async (_event, label: Partial<Label>) => saveLabel(label))
+
+  handle('label:delete', async (_event, id: string) => {
+    deleteLabel(id)
+    return true
+  })
+
+  handle(
+    'messages:apply-label',
+    async (_event, ids: string[], labelId: string, add: boolean) => {
+      applyLabelToMessages(ids, labelId, add)
+      return labelsOfMessages(ids)
+    }
+  )
+
+  handle('messages:labels', async (_event, ids: string[]) => labelsOfMessages(ids))
 
   handle('attachments:all', async (_event, limit = 400) => {
     const rows = getDb()

@@ -3,6 +3,7 @@ import type { AppApi, PickedFile, TestResult } from '@shared/api'
 import type {
   Account,
   AttachmentRecord,
+  Label,
   AccountConfig,
   AccountCredentials,
   AppSettings,
@@ -88,7 +89,13 @@ const api: AppApi = {
   settingsSet: (patch) => invoke<void>('settings:set', patch),
   oauthAuthorize: (input) =>
     invoke<{ refreshToken: string; email: string }>('oauth:authorize', input),
+  securityStatus: () => invoke<{ enabled: boolean }>('security:status'),
+  securityVerify: (password) => invoke<boolean>('security:verify', password),
+  securitySetPassword: (previous, next) => invoke<boolean>('security:set-password', previous, next),
+  securityClear: (previous) => invoke<boolean>('security:clear', previous),
   appVersion: () => invoke<string>('app:version'),
+  backupCreate: () => invoke<{ dir: string; size: number } | null>('backup:create'),
+  backupRestore: () => invoke<boolean>('backup:restore'),
   openPath: (path) => invoke<void>('app:open-path', path),
   windowAction: (action) => invoke<void>('window:action', action),
 
@@ -120,6 +127,12 @@ const extra = {
   messagesCount: (folderId: string) => invoke<number>('messages:count', folderId),
   messageExport: (id: string) => invoke<string | null>('message:export', id),
   attachmentsAll: (limit?: number) => invoke<AttachmentRecord[]>('attachments:all', limit),
+  labelsList: () => invoke<Label[]>('labels:list'),
+  labelSave: (label: Partial<Label>) => invoke<Label>('label:save', label),
+  labelDelete: (id: string) => invoke<void>('label:delete', id),
+  applyLabel: (ids: string[], labelId: string, add: boolean) =>
+    invoke<Record<string, string[]>>('messages:apply-label', ids, labelId, add),
+  messagesLabels: (ids: string[]) => invoke<Record<string, string[]>>('messages:labels', ids),
   statsOverview: () => invoke<StatsOverview>('stats:overview'),
   messagesExport: (ids: string[]) => invoke<{ dir: string; count: number } | null>('messages:export', ids),
   messagePrint: (id: string) => invoke<boolean>('message:print', id),

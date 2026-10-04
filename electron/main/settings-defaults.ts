@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trayEnabled: true,
   alwaysLoadImages: false,
   sendDelaySeconds: 10,
-  closeToTray: true,
+  closeToTray: false,
   openAtLogin: false,
   listDensity: 'comfortable',
   listWidth: 404

@@ -110,7 +110,13 @@ export interface AppApi {
     tenant: string
     email: string
   }): Promise<{ refreshToken: string; email: string }>
+  securityStatus(): Promise<{ enabled: boolean }>
+  securityVerify(password: string): Promise<boolean>
+  securitySetPassword(previous: string, next: string): Promise<boolean>
+  securityClear(previous: string): Promise<boolean>
   appVersion(): Promise<string>
+  backupCreate(): Promise<{ dir: string; size: number } | null>
+  backupRestore(): Promise<boolean>
   openPath(path: string): Promise<void>
   windowAction(action: 'minimize' | 'maximize' | 'close'): Promise<void>
   onEvent(listener: (event: MainEvent) => void): () => void

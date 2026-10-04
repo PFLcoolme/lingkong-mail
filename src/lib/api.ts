@@ -2,6 +2,7 @@ import type { AppApi, PickedFile, TestResult } from '@shared/api'
 import type {
   AttachmentRecord,
   Contact,
+  Label,
   MainEvent,
   MessageSummary,
   StatsOverview,
@@ -14,6 +15,11 @@ type ExtraApi = {
   messagesCount: (folderId: string) => Promise<number>
   messageExport: (id: string) => Promise<string | null>
   attachmentsAll: (limit?: number) => Promise<AttachmentRecord[]>
+  labelsList: () => Promise<Label[]>
+  labelSave: (label: Partial<Label>) => Promise<Label>
+  labelDelete: (id: string) => Promise<void>
+  applyLabel: (ids: string[], labelId: string, add: boolean) => Promise<Record<string, string[]>>
+  messagesLabels: (ids: string[]) => Promise<Record<string, string[]>>
   statsOverview: () => Promise<StatsOverview>
   messagesExport: (ids: string[]) => Promise<{ dir: string; count: number } | null>
   messagePrint: (id: string) => Promise<boolean>
@@ -30,6 +36,10 @@ type ExtraApi = {
 }
 
 export type Api = AppApi & ExtraApi
+
+/** 构建时注入的时间戳（见 electron.vite.config.ts 的 define） */
+export const BUILD_TIME: string =
+  typeof __BUILD_TIME__ === 'string' ? __BUILD_TIME__ : ''
 
 export const api: Api = (window as unknown as { api: Api }).api
 

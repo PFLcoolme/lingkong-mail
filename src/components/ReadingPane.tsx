@@ -24,6 +24,8 @@ import CloseIcon from '@mui/icons-material/CloseRounded'
 import DownloadIcon from '@mui/icons-material/DownloadRounded'
 import PrintIcon from '@mui/icons-material/PrintRounded'
 import SnoozeIcon from '@mui/icons-material/SnoozeRounded'
+import LabelIcon from '@mui/icons-material/LabelRounded'
+import CheckIcon from '@mui/icons-material/CheckRounded'
 import TranslateIcon from '@mui/icons-material/TranslateRounded'
 import ReplyIcon from '@mui/icons-material/ReplyRounded'
 import ReplyAllIcon from '@mui/icons-material/ReplyAllRounded'
@@ -55,6 +57,10 @@ export default function ReadingPane(): React.ReactNode {
   const [showRemoteImages, setShowRemoteImages] = useState(false)
   const [preview, setPreview] = useState<{ filename: string; path: string; mimeType: string } | null>(null)
   const [snoozeAnchor, setSnoozeAnchor] = useState<HTMLElement | null>(null)
+  const [labelAnchor, setLabelAnchor] = useState<HTMLElement | null>(null)
+  const labels = useApp((s) => s.labels)
+  const messageLabelMap = useApp((s) => s.messageLabelMap)
+  const toggleLabelOnMessages = useApp((s) => s.toggleLabelOnMessages)
   const snoozeMessages = useApp((s) => s.snoozeMessages)
   const [snoozeCustomOpen, setSnoozeCustomOpen] = useState(false)
   const [snoozeValue, setSnoozeValue] = useState<string>(() =>
@@ -190,6 +196,33 @@ export default function ReadingPane(): React.ReactNode {
             <DownloadIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Tooltip>
+        <Tooltip title="标签" disableInteractive>
+          <IconButton size="small" onClick={(event) => setLabelAnchor(event.currentTarget)} aria-label="标签">
+            <LabelIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+        <Menu anchorEl={labelAnchor} open={Boolean(labelAnchor)} onClose={() => setLabelAnchor(null)}>
+          {labels.length ? (
+            labels.map((label) => {
+              const active = (messageLabelMap[message.id] ?? []).includes(label.id)
+              return (
+                <MenuItem
+                  key={label.id}
+                  sx={{ fontSize: 13, gap: 1 }}
+                  onClick={() => void toggleLabelOnMessages([message.id], label.id)}
+                >
+                  <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: label.color, mr: 1 }} />
+                  <Box sx={{ flex: 1 }}>{label.name}</Box>
+                  {active ? <CheckIcon sx={{ fontSize: 15 }} /> : null}
+                </MenuItem>
+              )
+            })
+          ) : (
+            <MenuItem disabled sx={{ fontSize: 13 }}>
+              还没有标签（可在设置 → 标签中创建）
+            </MenuItem>
+          )}
+        </Menu>
         <Tooltip title="稍后提醒" disableInteractive>
           <IconButton
             size="small"

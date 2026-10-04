@@ -150,6 +150,14 @@ export interface SavedSearch {
   createdAt: number
 }
 
+export interface Label {
+  id: string
+  name: string
+  color: string
+  sortOrder: number
+  count?: number
+}
+
 export interface AttachmentRecord {
   id: string
   messageId: string
@@ -251,6 +259,7 @@ export interface SendPayload {
 export interface ListQuery {
   accountId: string
   folderId: string
+  labelId?: string
   limit: number
   offset: number
   unreadOnly: boolean
@@ -290,6 +299,7 @@ export type MainEvent =
   | { type: 'error'; payload: { title: string; message: string } }
   | { type: 'toast'; payload: { level: 'info' | 'success' | 'error'; message: string } }
   | { type: 'compose-mailto'; payload: { to: string; subject: string; body: string } }
+  | { type: 'lock-now'; payload: Record<string, never> }
 
 export interface AppSettings {
   theme: 'system' | 'light' | 'dark'

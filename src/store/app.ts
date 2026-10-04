@@ -4,6 +4,7 @@ import { buildQuote, parseAddressInput } from '@/lib/format'
 import { translateStatic } from '@/lib/i18n'
 import type {
   Account,
+  Label,
   OutboxItem,
   SavedSearch,
   SnoozedItem,
@@ -64,7 +65,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   trayEnabled: true,
   alwaysLoadImages: false,
   sendDelaySeconds: 10,
-  closeToTray: true,
+  closeToTray: false,
   openAtLogin: false,
   listDensity: 'comfortable',
   listWidth: 404
@@ -102,7 +103,13 @@ interface AppState {
   outbox: OutboxItem[]
   snoozed: SnoozedItem[]
   savedSearches: SavedSearch[]
+  labels: Label[]
+  messageLabelMap: Record<string, string[]>
+  activeLabelId: string
   allowedImageSenders: string[]
+  locked: boolean
+  lockChecked: boolean
+  lockEnabled: boolean
   translation: string
   translating: boolean
 
@@ -127,6 +134,7 @@ interface AppState {
   replyTo: (all?: boolean) => void
   forwardMessage: () => void
   selectRelative: (delta: number) => void
+  archiveSelected: () => Promise<void>
   closeComposer: () => void
   sendComposer: (options?: { delaySeconds?: number; scheduledAt?: number }) => Promise<void>
   saveDraft: () => Promise<void>
@@ -139,6 +147,11 @@ interface AppState {
   loadOutbox: () => Promise<void>
   loadSnoozed: () => Promise<void>
   loadSavedSearches: () => Promise<void>
+  loadLabels: () => Promise<void>
+  selectLabel: (labelId: string) => Promise<void>
+  toggleLabelOnMessages: (ids: string[], labelId: string) => Promise<void>
+  saveLabel: (label: Partial<Label>) => Promise<void>
+  deleteLabel: (id: string) => Promise<void>
   snoozeMessages: (ids: string[], wakeAt: number) => Promise<void>
   wakeSnoozed: (messageId: string) => Promise<void>
   cancelScheduledSend: (id: string) => Promise<void>
@@ -197,7 +210,13 @@ export const useApp = create<AppState>((set, get) => ({
   outbox: [],
   snoozed: [],
   savedSearches: [],
+  labels: [],
+  messageLabelMap: {},
+  activeLabelId: '',
   allowedImageSenders: [],
+  locked: false,
+  lockChecked: false,
+  lockEnabled: false,
   translation: '',
   translating: false,
 
@@ -215,6 +234,38 @@ export const useApp = create<AppState>((set, get) => ({
 
   async loadSavedSearches() {
     set({ savedSearches: await api.searchesList() })
+  },
+
+  async loadLabels() {
+    set({ labels: await api.labelsList() })
+  },
+
+  async selectLabel(labelId: string) {
+    const next = get().activeLabelId === labelId ? '' : labelId
+    set({ activeLabelId: next, selectedId: null, current: null })
+    await get().reloadMessages()
+  },
+
+  async toggleLabelOnMessages(ids: string[], labelId: string) {
+    const label = get().labels.find((item) => item.id === labelId)
+    const current = get().messageLabelMap
+    const allHave = ids.every((id) => (current[id] ?? []).includes(labelId))
+    const map = await api.applyLabel(ids, labelId, !allHave)
+    set({ messageLabelMap: { ...current, ...map } })
+    await get().loadLabels()
+    get().pushToast('success', allHave ? `已移除标签「${label?.name ?? ''}」` : `已加上标签「${label?.name ?? ''}」`)
+  },
+
+  async saveLabel(label: Partial<Label>) {
+    await api.labelSave(label)
+    await get().loadLabels()
+  },
+
+  async deleteLabel(id: string) {
+    await api.labelDelete(id)
+    if (get().activeLabelId === id) set({ activeLabelId: '' })
+    await get().loadLabels()
+    await get().reloadMessages()
   },
 
   async snoozeMessages(ids: string[], wakeAt: number) {
@@ -253,6 +304,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   async saveSearch(name: string, query: string) {
     await api.searchSave({ name, query })
+    await get().loadLabels()
     await get().loadSavedSearches()
   },
 
@@ -296,6 +348,12 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async bootstrap() {
+    try {
+      const lock = await api.securityStatus()
+      set({ lockEnabled: lock.enabled, locked: lock.enabled, lockChecked: true })
+    } catch {
+      set({ lockChecked: true })
+    }
     const settings = await api.settingsGet()
     set({ settings })
     document.documentElement.dataset.theme = resolveTheme(settings.theme)
@@ -334,14 +392,15 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async reloadMessages() {
-    const { activeAccountId, activeFolderId, unreadOnly, withAttachments, filterQuery } = get()
-    if (!activeFolderId) return
+    const { activeAccountId, activeFolderId, unreadOnly, withAttachments, filterQuery, activeLabelId } = get()
+    if (!activeFolderId && !activeLabelId) return
     set({ loadingMessages: true })
     try {
       const pageSize = 120
       const messages = await api.messagesList({
-        accountId: activeAccountId,
-        folderId: activeFolderId,
+        accountId: activeLabelId ? '' : activeAccountId,
+        folderId: activeLabelId ? '' : activeFolderId,
+        labelId: activeLabelId || undefined,
         limit: pageSize,
         offset: 0,
         unreadOnly,
@@ -349,7 +408,14 @@ export const useApp = create<AppState>((set, get) => ({
         withAttachmentsOnly: withAttachments,
         search: filterQuery
       })
-      set({ messages, hasMoreMessages: messages.length >= pageSize })
+      const labelMap = messages.length
+        ? await api.messagesLabels(messages.map((item) => item.id))
+        : {}
+      set({
+        messages,
+        messageLabelMap: labelMap,
+        hasMoreMessages: messages.length >= pageSize
+      })
     } finally {
       set({ loadingMessages: false })
     }
@@ -538,6 +604,18 @@ export const useApp = create<AppState>((set, get) => ({
         mimeType: a.mimeType
       }))
     })
+  },
+
+  async archiveSelected() {
+    const { selectedId, messages, folders } = get()
+    if (!selectedId) return
+    const message = messages.find((item) => item.id === selectedId)
+    const archive = folders.find((folder) => folder.type === 'archive')
+    if (!message || !archive) {
+      get().pushToast('error', '当前账户没有「归档」文件夹')
+      return
+    }
+    await get().moveTo([selectedId], archive.path)
   },
 
   selectRelative(delta: number) {
@@ -750,6 +828,10 @@ function handleEvent(event: MainEvent, set: SetState, get: () => AppState): void
     }
     case 'error': {
       get().pushToast('error', event.payload.message)
+      break
+    }
+    case 'lock-now': {
+      if (get().lockEnabled) set({ locked: true, translation: '' })
       break
     }
     case 'compose-mailto': {

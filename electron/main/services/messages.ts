@@ -275,12 +275,20 @@ export function parseSearchQuery(input: string): SearchFilters {
 
 export function listMessages(query: ListQuery): MessageSummary[] {
   const db = getDb()
-  const where: string[] = [
-    'm.account_id = ?',
-    'm.folder_id = ?',
-    'm.id NOT IN (SELECT message_id FROM snoozed)'
-  ]
-  const params: unknown[] = [query.accountId, query.folderId]
+  const where: string[] = ['m.id NOT IN (SELECT message_id FROM snoozed)']
+  const params: unknown[] = []
+  if (query.labelId) {
+    where.push('m.id IN (SELECT message_id FROM message_labels WHERE label_id = ?)')
+    params.push(query.labelId)
+  }
+  if (query.accountId) {
+    where.push('m.account_id = ?')
+    params.push(query.accountId)
+  }
+  if (query.folderId) {
+    where.push('m.folder_id = ?')
+    params.push(query.folderId)
+  }
   if (query.unreadOnly) where.push('m.seen = 0')
   if (query.flaggedOnly) where.push('m.flagged = 1')
   if (query.withAttachmentsOnly) where.push('m.attachment_count > 0')

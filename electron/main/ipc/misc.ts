@@ -1,4 +1,4 @@
-import { app, shell } from 'electron'
+import { app, dialog, shell } from 'electron'
 import { getMainWindow } from '../window'
 import type { AppSettings, Contact, Rule, Template } from '@shared/types'
 import { handle } from './common'
@@ -9,6 +9,8 @@ import { translateText } from '../services/translate'
 import { settingsGet, settingsSet } from '../services/accounts'
 import { authorizeWithBrowser, OAUTH_PROVIDERS } from '../services/oauth'
 import { emit } from '../services/sync'
+import { createBackup, restoreBackup } from '../services/backup'
+import { clearPassword, lockStatus, setPassword, verifyPassword } from '../services/security'
 
 import { DEFAULT_SETTINGS } from '../settings-defaults'
 
@@ -77,6 +79,50 @@ export function registerMiscHandlers(): void {
     async (_event, input: { provider: string; clientId: string; clientSecret: string; tenant: string; email: string }) =>
       authorizeWithBrowser(input)
   )
+
+  handle('backup:create', async () => {
+    const window = getMainWindow()
+    const result = window
+      ? await dialog.showOpenDialog(window, {
+          title: '选择备份保存位置',
+          properties: ['openDirectory', 'createDirectory']
+        })
+      : await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
+    if (result.canceled || !result.filePaths.length) return null
+    const backup = createBackup(result.filePaths[0])
+    return { dir: backup.dir, size: backup.size }
+  })
+
+  handle('backup:restore', async () => {
+    const window = getMainWindow()
+    const result = window
+      ? await dialog.showOpenDialog(window, { title: '选择备份目录', properties: ['openDirectory'] })
+      : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    if (result.canceled || !result.filePaths.length) return false
+    restoreBackup(result.filePaths[0])
+    setTimeout(() => {
+      app.relaunch()
+      app.exit(0)
+    }, 800)
+    return true
+  })
+
+  handle('security:status', () => lockStatus())
+
+  handle('security:verify', async (_event, password: string) => verifyPassword(password))
+
+  handle('security:set-password', async (_event, previous: string, next: string) => {
+    if (!verifyPassword(previous)) return false
+    if (!next || next.length < 4) throw new Error('密码至少 4 位')
+    setPassword(next)
+    return true
+  })
+
+  handle('security:clear', async (_event, previous: string) => {
+    if (!verifyPassword(previous)) return false
+    clearPassword()
+    return true
+  })
 
   handle('app:version', () => app.getVersion())
 

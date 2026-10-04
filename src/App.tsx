@@ -13,6 +13,7 @@ import Composer from './components/Composer'
 import AddAccountWizard from './components/AddAccountWizard'
 import SettingsDialog from './components/SettingsDialog'
 import Toasts from './components/Toasts'
+import LockScreen from './components/LockScreen'
 import { EmptyState } from './components/ui'
 
 export default function App(): React.ReactNode {
@@ -24,6 +25,8 @@ export default function App(): React.ReactNode {
   const composer = useApp((s) => s.composer)
   const openWizard = useApp((s) => s.openWizard)
   const settings = useApp((s) => s.settings)
+  const locked = useApp((s) => s.locked)
+  const lockChecked = useApp((s) => s.lockChecked)
   const t = useT()
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -84,6 +87,11 @@ export default function App(): React.ReactNode {
         }
         return
       }
+      if (event.key.toLowerCase() === 'e' && state.selectedId) {
+        event.preventDefault()
+        void state.archiveSelected()
+        return
+      }
       if (event.key === 'r' && state.current) {
         event.preventDefault()
         state.replyTo(false)
@@ -117,6 +125,25 @@ export default function App(): React.ReactNode {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // 锁定状态检查完成前只显示底色，避免主界面一闪而过
+  if (!lockChecked) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ height: '100%' }} />
+      </ThemeProvider>
+    )
+  }
+
+  if (locked) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <LockScreen />
+      </ThemeProvider>
+    )
+  }
 
   return (
     <ThemeProvider theme={theme}>

@@ -26,12 +26,15 @@ import AudioIcon from '@mui/icons-material/AudiotrackRounded'
 import FileIcon from '@mui/icons-material/InsertDriveFileRounded'
 import OpenIcon from '@mui/icons-material/OpenInNewRounded'
 import JumpIcon from '@mui/icons-material/SubdirectoryArrowRightRounded'
+import BackupIcon from '@mui/icons-material/BackupRounded'
+import RestoreIcon from '@mui/icons-material/SettingsBackupRestoreRounded'
 import DeleteIcon from '@mui/icons-material/DeleteOutlineRounded'
 import PersonAddIcon from '@mui/icons-material/PersonAddRounded'
 import FolderIcon from '@mui/icons-material/FolderOpenRounded'
 import type {
   Account,
   AttachmentRecord,
+  Label,
   Rule,
   RuleActionType,
   RuleField,
@@ -39,7 +42,7 @@ import type {
   StatsOverview,
   Template
 } from '@shared/types'
-import { api } from '@/lib/api'
+import { api, BUILD_TIME } from '@/lib/api'
 import { useApp } from '@/store/app'
 import { Avatar, Field, Modal, SectionTitle, Switch } from './ui'
 import { useT } from '@/lib/i18n'
@@ -52,6 +55,7 @@ const TABS = [
   'rules',
   'contacts',
   'templates',
+  'labels',
   'attachments',
   'stats',
   'about'
@@ -84,9 +88,10 @@ export default function SettingsDialog(): React.ReactNode {
           {tab === 3 ? <RulesTab /> : null}
           {tab === 4 ? <ContactsTab /> : null}
           {tab === 5 ? <TemplatesTab /> : null}
-          {tab === 6 ? <AttachmentsTab /> : null}
-          {tab === 7 ? <StatsTab /> : null}
-          {tab === 8 ? <AboutTab /> : null}
+          {tab === 6 ? <LabelsTab /> : null}
+          {tab === 7 ? <AttachmentsTab /> : null}
+          {tab === 8 ? <StatsTab /> : null}
+          {tab === 9 ? <AboutTab /> : null}
         </Box>
       </Stack>
     </Modal>
@@ -354,6 +359,8 @@ function GeneralTab(): React.ReactNode {
           </Box>
         </Stack>
       </Box>
+
+      <LockSection />
 
       <Box>
         <SectionTitle>收取与通知</SectionTitle>
@@ -790,11 +797,20 @@ function ContactsTab(): React.ReactNode {
 function AboutTab(): React.ReactNode {
   const accounts = useApp((s) => s.accounts)
   const pushToast = useApp((s) => s.pushToast)
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    void api.appVersion().then(setVersion)
+  }, [])
   return (
     <Box>
       <SectionTitle>空灵邮箱</SectionTitle>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2.5 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         本地优先的桌面邮件客户端，邮件内容缓存在本机 SQLite 数据库中，支持离线全文检索。
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2.5 }}>
+        当前版本 <b>v{version || '…'}</b>
+        {BUILD_TIME ? ` · 构建于 ${new Date(BUILD_TIME).toLocaleString()}` : ''}
       </Typography>
       <Stack spacing={1.25}>
         <Button
@@ -814,6 +830,30 @@ function AboutTab(): React.ReactNode {
           onClick={() => void api.openPath('~')}
         >
           打开主目录
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<BackupIcon sx={{ fontSize: 16 }} />}
+          sx={{ justifyContent: 'flex-start', borderRadius: 2 }}
+          onClick={async () => {
+            const result = await api.backupCreate()
+            if (result) pushToast('success', `备份完成：${result.dir}`)
+          }}
+        >
+          备份邮件数据（数据库 + 附件）
+        </Button>
+        <Button
+          variant="outlined"
+          color="warning"
+          startIcon={<RestoreIcon sx={{ fontSize: 16 }} />}
+          sx={{ justifyContent: 'flex-start', borderRadius: 2 }}
+          onClick={async () => {
+            if (!window.confirm('从备份恢复会覆盖当前所有邮件数据，并自动重启应用。确定继续吗？')) return
+            const ok = await api.backupRestore()
+            if (!ok) pushToast('info', '已取消恢复')
+          }}
+        >
+          从备份恢复数据（会重启应用）
         </Button>
       </Stack>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 3 }}>
@@ -1269,6 +1309,167 @@ function StatsTab(): React.ReactNode {
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2.5 }}>
         统计基于本地已缓存的邮件（账户数：{accounts.length}）
       </Typography>
+    </Box>
+  )
+}
+
+function LabelsTab(): React.ReactNode {
+  const theme = useTheme()
+  const t = useT()
+  const labels = useApp((s) => s.labels)
+  const saveLabel = useApp((s) => s.saveLabel)
+  const deleteLabel = useApp((s) => s.deleteLabel)
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('#5b8def')
+
+  return (
+    <Box>
+      <SectionTitle>{t('settings.labels')}</SectionTitle>
+
+      <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
+        <TextField
+          size="small"
+          placeholder="标签名称"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          sx={{ flex: 1 }}
+        />
+        <TextField
+          size="small"
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          sx={{ width: 70 }}
+        />
+        <Button
+          variant="contained"
+          sx={{ borderRadius: 2, height: 32 }}
+          onClick={async () => {
+            if (!name.trim()) return
+            await saveLabel({ name: name.trim(), color })
+            setName('')
+          }}
+        >
+          新建标签
+        </Button>
+      </Stack>
+
+      {labels.length ? (
+        labels.map((label: Label) => (
+          <Paper
+            key={label.id}
+            elevation={0}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.25,
+              p: 1.25,
+              mb: 1,
+              borderRadius: 2.5,
+              bgcolor: alpha(theme.palette.text.primary, 0.03)
+            }}
+          >
+            <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: label.color }} />
+            <Typography sx={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{label.name}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {label.count ?? 0} 封
+            </Typography>
+            <TextField
+              size="small"
+              type="color"
+              value={label.color}
+              onChange={(e) => void saveLabel({ id: label.id, name: label.name, color: e.target.value })}
+              sx={{ width: 56 }}
+            />
+            <IconButton
+              size="small"
+              onClick={() => void deleteLabel(label.id)}
+              aria-label="删除标签"
+              sx={{ color: 'error.main' }}
+            >
+              <DeleteIcon sx={{ fontSize: 17 }} />
+            </IconButton>
+          </Paper>
+        ))
+      ) : (
+        <Typography variant="caption" color="text.secondary">
+          还没有标签。创建后可在阅读窗格给邮件打标签，侧边栏点标签即可筛选。
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
+function LockSection(): React.ReactNode {
+  const pushToast = useApp((s) => s.pushToast)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [enabled, setEnabled] = useState(false)
+
+  useEffect(() => {
+    void api.securityStatus().then((status) => setEnabled(status.enabled))
+  }, [])
+
+  async function apply(): Promise<void> {
+    if (!next || next.length < 4) {
+      pushToast('error', '新密码至少 4 位')
+      return
+    }
+    const ok = await api.securitySetPassword(current, next)
+    if (ok) {
+      pushToast('success', '应用锁已开启，下次启动需要输入密码')
+      setEnabled(true)
+      setCurrent('')
+      setNext('')
+    } else {
+      pushToast('error', '当前密码不正确')
+    }
+  }
+
+  async function disable(): Promise<void> {
+    const ok = await api.securityClear(current)
+    if (ok) {
+      pushToast('success', '应用锁已关闭')
+      setEnabled(false)
+      setCurrent('')
+      setNext('')
+    } else {
+      pushToast('error', '当前密码不正确')
+    }
+  }
+
+  return (
+    <Box>
+      <SectionTitle>安全</SectionTitle>
+      <Stack spacing={1.25}>
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            type="password"
+            placeholder={enabled ? '当前密码' : '当前密码（首次可留空）'}
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
+          <TextField
+            size="small"
+            type="password"
+            placeholder="新密码（至少 4 位）"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+          />
+          <Button variant="contained" onClick={() => void apply()} sx={{ borderRadius: 2, height: 32, whiteSpace: 'nowrap' }}>
+            {enabled ? '修改密码' : '开启应用锁'}
+          </Button>
+          {enabled ? (
+            <Button variant="outlined" color="warning" onClick={() => void disable()} sx={{ borderRadius: 2, height: 32 }}>
+              关闭
+            </Button>
+          ) : null}
+        </Stack>
+        <Typography variant="caption" color="text.secondary">
+          应用锁用于防止他人直接打开查看邮件；它不会加密数据库文件，如需更强保护建议同时使用系统磁盘加密。
+        </Typography>
+      </Stack>
     </Box>
   )
 }

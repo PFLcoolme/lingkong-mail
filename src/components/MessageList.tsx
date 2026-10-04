@@ -59,6 +59,8 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
   const loadingMore = useApp((s) => s.loadingMore)
   const loadMoreMessages = useApp((s) => s.loadMoreMessages)
   const saveSearch = useApp((s) => s.saveSearch)
+  const labels = useApp((s) => s.labels)
+  const messageLabelMap = useApp((s) => s.messageLabelMap)
   const density = useApp((s) => s.settings.listDensity)
   const storedWidth = useApp((s) => s.settings.listWidth)
   const updateSettings = useApp((s) => s.updateSettings)
@@ -471,6 +473,17 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
                   {item.attachmentCount ? (
                     <AttachFileIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                   ) : null}
+                  {(messageLabelMap[item.id] ?? []).slice(0, 4).map((labelId) => {
+                    const label = labels.find((item2) => item2.id === labelId)
+                    if (!label) return null
+                    return (
+                      <Box
+                        key={labelId}
+                        title={label.name}
+                        sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: label.color }}
+                      />
+                    )
+                  })}
                   {!item.seen ? (
                     <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.5 }} />
                   ) : null}

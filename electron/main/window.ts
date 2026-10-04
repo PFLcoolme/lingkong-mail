@@ -34,7 +34,17 @@ export function createMainWindow(): BrowserWindow {
     }
   })
 
-  window.once('ready-to-show', () => window?.show())
+  let firstShow = true
+  window.once('ready-to-show', () => {
+    firstShow = false
+    window?.show()
+  })
+
+  // 窗口被重新唤出（例如从托盘恢复）时要求重新解锁
+  window.on('show', () => {
+    if (firstShow) return
+    window?.webContents.send('main:event', { type: 'lock-now', payload: {} })
+  })
 
   // 关闭时最小化到托盘（而非退出）
   window.on('close', (event) => {

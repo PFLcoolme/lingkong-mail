@@ -28,6 +28,9 @@ export default defineConfig({
   renderer: {
     root: resolve(__dirname, 'src'),
     plugins: [react()],
+    define: {
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString())
+    },
     resolve: {
       alias: {
         '@shared': resolve('shared'),

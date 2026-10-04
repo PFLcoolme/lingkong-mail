@@ -165,6 +165,20 @@ CREATE TABLE IF NOT EXISTS saved_searches (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS labels (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#5b8def',
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS message_labels (
+  message_id TEXT NOT NULL,
+  label_id TEXT NOT NULL,
+  PRIMARY KEY (message_id, label_id)
+);
+CREATE INDEX IF NOT EXISTS idx_message_labels_label ON message_labels(label_id);
+
 CREATE TABLE IF NOT EXISTS templates (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL DEFAULT '',

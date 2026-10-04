@@ -78,6 +78,10 @@ export default function Sidebar(): React.ReactNode {
   const wakeSnoozed = useApp((s) => s.wakeSnoozed)
   const runSearch = useApp((s) => s.runSearch)
   const removeSearch = useApp((s) => s.removeSearch)
+  const labels = useApp((s) => s.labels)
+  const activeLabelId = useApp((s) => s.activeLabelId)
+  const selectLabel = useApp((s) => s.selectLabel)
+  const loadLabels = useApp((s) => s.loadLabels)
 
   const t = useT()
   const [accountsOpen, setAccountsOpen] = useState(true)
@@ -255,6 +259,37 @@ export default function Sidebar(): React.ReactNode {
             </Box>
           )
         })}
+
+        {labels.length ? (
+          <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
+            {sectionHeader('标签', true, () => void loadLabels())}
+            <List dense disablePadding>
+              {labels.map((label) => (
+                <ListItemButton
+                  key={label.id}
+                  selected={activeLabelId === label.id}
+                  onClick={() => void selectLabel(label.id)}
+                  sx={{ py: 0.4, minHeight: 30 }}
+                >
+                  <ListItemIcon sx={{ minWidth: 30, justifyContent: 'center' }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: label.color }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={label.name}
+                    slotProps={{
+                      primary: {
+                        sx: { fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                      }
+                    }}
+                  />
+                  {label.count ? (
+                    <Chip size="small" label={label.count} sx={{ height: 18, fontSize: 10.5 }} />
+                  ) : null}
+                </ListItemButton>
+              ))}
+            </List>
+          </Box>
+        ) : null}
 
         {savedSearches.length ? (
           <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
