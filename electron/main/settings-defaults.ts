@@ -22,5 +22,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alwaysLoadImages: false,
   sendDelaySeconds: 10,
   closeToTray: true,
-  openAtLogin: false
+  openAtLogin: false,
+  listDensity: 'comfortable',
+  listWidth: 404
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Box,
   Checkbox,
@@ -59,6 +59,34 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
   const loadingMore = useApp((s) => s.loadingMore)
   const loadMoreMessages = useApp((s) => s.loadMoreMessages)
   const saveSearch = useApp((s) => s.saveSearch)
+  const density = useApp((s) => s.settings.listDensity)
+  const storedWidth = useApp((s) => s.settings.listWidth)
+  const updateSettings = useApp((s) => s.updateSettings)
+  const [width, setWidth] = useState(storedWidth || 404)
+  const widthRef = useRef(width)
+  widthRef.current = width
+  const compact = density === 'compact'
+
+  useEffect(() => {
+    if (storedWidth && Math.abs(storedWidth - widthRef.current) > 60) setWidth(storedWidth)
+  }, [storedWidth])
+
+  function startResize(event: React.MouseEvent): void {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = widthRef.current
+    const onMove = (moveEvent: MouseEvent): void => {
+      const next = Math.min(760, Math.max(280, startWidth + (moveEvent.clientX - startX)))
+      setWidth(next)
+    }
+    const onUp = (): void => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      void updateSettings({ listWidth: widthRef.current })
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
 
   const threadView = useApp((s) => s.settings.threadView)
   const [checked, setChecked] = useState<string[]>([])
@@ -136,7 +164,8 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
     <Paper
       elevation={0}
       sx={{
-        width: layout === 'row' ? 404 : '100%',
+        position: 'relative',
+        width: layout === 'row' ? width : '100%',
         height: layout === 'row' ? '100%' : '46%',
         flexShrink: 0,
         borderRadius: 0,
@@ -335,14 +364,14 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
                   display: 'flex',
                   gap: 1.25,
                   px: 1.5,
-                  py: 1.25,
+                  py: compact ? 0.6 : 1.25,
                   borderBottom: `1px solid ${theme.palette.divider}`,
                   bgcolor: selected ? alpha(theme.palette.text.primary, 0.09) : 'transparent'
                 }}
               >
                 <Box
                   onClick={(e) => e.stopPropagation()}
-                  sx={{ display: 'flex', alignSelf: 'flex-start', mt: 0.25 }}
+                  sx={{ display: 'flex', alignSelf: 'flex-start', mt: compact ? 0 : 0.25 }}
                 >
                   <Checkbox
                     size="small"
@@ -354,7 +383,7 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
                     slotProps={{ input: { 'aria-label': '选择邮件' } }}
                   />
                 </Box>
-                <Avatar name={item.from[0]?.name || item.from[0]?.address || '?'} size={32} />
+                <Avatar name={item.from[0]?.name || item.from[0]?.address || '?'} size={compact ? 24 : 32} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                     <Typography
@@ -384,7 +413,7 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
                   >
                     {item.subject}
                   </Typography>
-                  {showSnippet ? (
+                  {showSnippet && !compact ? (
                     <Typography
                       variant="caption"
                       color="text.secondary"
@@ -475,6 +504,22 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
             {t('list.count', { n: messages.length })}
           </Typography>
         </Box>
+      ) : null}
+
+      {layout === 'row' ? (
+        <Box
+          onMouseDown={startResize}
+          sx={{
+            position: 'absolute',
+            top: 0,
+            right: -3,
+            width: 6,
+            height: '100%',
+            cursor: 'col-resize',
+            zIndex: 6,
+            '&:hover': { bgcolor: 'primary.main', opacity: 0.35 }
+          }}
+        />
       ) : null}
     </Paper>
   )

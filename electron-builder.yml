@@ -13,6 +13,9 @@ compression: maximum
 linux:
   executableName: kongling-mail
   category: Network;Email;
+  desktop:
+    entry:
+      MimeType: "x-scheme-handler/mailto;" 
   maintainer: cool
   icon: build/icon.png
   synopsis: 本地桌面邮箱管理客户端

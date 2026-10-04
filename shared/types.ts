@@ -150,6 +150,38 @@ export interface SavedSearch {
   createdAt: number
 }
 
+export interface AttachmentRecord {
+  id: string
+  messageId: string
+  filename: string
+  mimeType: string
+  size: number
+  path: string
+  inline: boolean
+  kind: string
+  subject: string
+  from: string
+  date: number
+  accountId: string
+  folderId: string
+}
+
+export interface StatsSeriesPoint {
+  day: number
+  count: number
+}
+
+export interface StatsOverview {
+  total: number
+  unread: number
+  withAttachments: number
+  accounts: number
+  received: StatsSeriesPoint[]
+  sent: StatsSeriesPoint[]
+  topSenders: { address: string; count: number }[]
+  perAccount: { id: string; name: string; color: string; total: number; unread: number }[]
+}
+
 export interface Template {
   id: string
   name: string
@@ -257,6 +289,7 @@ export type MainEvent =
   | { type: 'new-message'; payload: MessageSummary }
   | { type: 'error'; payload: { title: string; message: string } }
   | { type: 'toast'; payload: { level: 'info' | 'success' | 'error'; message: string } }
+  | { type: 'compose-mailto'; payload: { to: string; subject: string; body: string } }
 
 export interface AppSettings {
   theme: 'system' | 'light' | 'dark'
@@ -291,6 +324,10 @@ export interface AppSettings {
   closeToTray: boolean
   /** 开机自动启动 */
   openAtLogin: boolean
+  /** 邮件列表密度 */
+  listDensity: 'comfortable' | 'compact'
+  /** 邮件列表栏宽度 */
+  listWidth: number
 }
 
 export interface ProviderPreset {

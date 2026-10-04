@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { AppApi, PickedFile, TestResult } from '@shared/api'
 import type {
   Account,
+  AttachmentRecord,
   AccountConfig,
   AccountCredentials,
   AppSettings,
@@ -21,6 +22,7 @@ import type {
   SavedSearch,
   SendPayload,
   SnoozedItem,
+  StatsOverview,
   Template
 } from '@shared/types'
 
@@ -117,6 +119,8 @@ const extra = {
   messagesLocalDelete: (ids: string[]) => invoke<void>('messages:local-delete', ids),
   messagesCount: (folderId: string) => invoke<number>('messages:count', folderId),
   messageExport: (id: string) => invoke<string | null>('message:export', id),
+  attachmentsAll: (limit?: number) => invoke<AttachmentRecord[]>('attachments:all', limit),
+  statsOverview: () => invoke<StatsOverview>('stats:overview'),
   messagesExport: (ids: string[]) => invoke<{ dir: string; count: number } | null>('messages:export', ids),
   messagePrint: (id: string) => invoke<boolean>('message:print', id),
   templatesList: () => invoke<Template[]>('templates:list'),

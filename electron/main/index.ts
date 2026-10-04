@@ -38,18 +38,43 @@ function scheduleAutoSync(): void {
   }, minutes * 60 * 1000)
 }
 
+function parseMailto(argv: string[]): { to: string; subject: string; body: string } | null {
+  const link = argv.find((arg) => arg.startsWith('mailto:'))
+  if (!link) return null
+  try {
+    const url = new URL(link)
+    return {
+      to: decodeURIComponent(url.pathname).replace(/^\/*/, ''),
+      subject: url.searchParams.get('subject') ?? '',
+      body: url.searchParams.get('body') ?? ''
+    }
+  } catch {
+    return null
+  }
+}
+
+function dispatchMailto(argv: string[]): void {
+  const parsed = parseMailto(argv)
+  if (!parsed) return
+  setTimeout(() => {
+    pushToRenderer({ type: 'compose-mailto', payload: parsed })
+  }, 800)
+}
+
 function pushToRenderer(event: MainEvent): void {
   const window = getMainWindow()
   if (!window || window.isDestroyed()) return
   window.webContents.send('main:event', event)
 }
 
-app.on('second-instance', () => {
+app.on('second-instance', (_event, argv) => {
   const window = getMainWindow()
   if (window) {
     if (window.isMinimized()) window.restore()
+    window.show()
     window.focus()
   }
+  dispatchMailto(argv)
 })
 
 app.on('window-all-closed', () => {
@@ -82,6 +107,10 @@ void app.whenReady().then(() => {
     app.setLoginItemSettings({ openAtLogin: true })
   }
   ipcMain.on('settings:changed', () => scheduleAutoSync())
+  // 首次启动若由 mailto: 链接唤起
+  dispatchMailto(process.argv)
+  app.setAsDefaultProtocolClient('mailto')
+
   if (settings.autoStartSync) {
     setTimeout(() => {
       void syncAllAccounts()

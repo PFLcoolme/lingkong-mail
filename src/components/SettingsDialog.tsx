@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Box,
   Button,
+  Chip,
   Divider,
   IconButton,
   MenuItem,
@@ -10,22 +11,51 @@ import {
   Tab,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
   alpha,
   useTheme
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/AddRounded'
+import ImageIcon from '@mui/icons-material/ImageRounded'
+import PdfIcon from '@mui/icons-material/PictureAsPdfRounded'
+import ZipIcon from '@mui/icons-material/FolderZipRounded'
+import DocIcon from '@mui/icons-material/DescriptionRounded'
+import VideoIcon from '@mui/icons-material/MovieRounded'
+import AudioIcon from '@mui/icons-material/AudiotrackRounded'
+import FileIcon from '@mui/icons-material/InsertDriveFileRounded'
+import OpenIcon from '@mui/icons-material/OpenInNewRounded'
+import JumpIcon from '@mui/icons-material/SubdirectoryArrowRightRounded'
 import DeleteIcon from '@mui/icons-material/DeleteOutlineRounded'
 import PersonAddIcon from '@mui/icons-material/PersonAddRounded'
 import FolderIcon from '@mui/icons-material/FolderOpenRounded'
-import type { Account, Rule, RuleActionType, RuleField, RuleOperator, Template } from '@shared/types'
+import type {
+  Account,
+  AttachmentRecord,
+  Rule,
+  RuleActionType,
+  RuleField,
+  RuleOperator,
+  StatsOverview,
+  Template
+} from '@shared/types'
 import { api } from '@/lib/api'
 import { useApp } from '@/store/app'
 import { Avatar, Field, Modal, SectionTitle, Switch } from './ui'
 import { useT } from '@/lib/i18n'
 import { formatFullDate } from '@/lib/format'
 
-const TABS = ['accounts', 'general', 'signature', 'rules', 'contacts', 'templates', 'about']
+const TABS = [
+  'accounts',
+  'general',
+  'signature',
+  'rules',
+  'contacts',
+  'templates',
+  'attachments',
+  'stats',
+  'about'
+]
 
 export default function SettingsDialog(): React.ReactNode {
   const [tab, setTab] = useState(0)
@@ -54,7 +84,9 @@ export default function SettingsDialog(): React.ReactNode {
           {tab === 3 ? <RulesTab /> : null}
           {tab === 4 ? <ContactsTab /> : null}
           {tab === 5 ? <TemplatesTab /> : null}
-          {tab === 6 ? <AboutTab /> : null}
+          {tab === 6 ? <AttachmentsTab /> : null}
+          {tab === 7 ? <StatsTab /> : null}
+          {tab === 8 ? <AboutTab /> : null}
         </Box>
       </Stack>
     </Modal>
@@ -222,6 +254,30 @@ function GeneralTab(): React.ReactNode {
               {theme === 'light' ? '浅色' : theme === 'dark' ? '深色' : '跟随系统'}
             </Button>
           ))}
+        </Stack>
+        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+          {[
+            { value: 'comfortable', label: '列表：舒适' },
+            { value: 'compact', label: '列表：紧凑' }
+          ].map((item) => (
+            <Button
+              key={item.value}
+              size="small"
+              variant={settings.listDensity === item.value ? 'contained' : 'outlined'}
+              onClick={() => void update({ listDensity: item.value as 'comfortable' | 'compact' })}
+              sx={{ borderRadius: 2, height: 30 }}
+            >
+              {item.label}
+            </Button>
+          ))}
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => void update({ listWidth: 404 })}
+            sx={{ borderRadius: 2, height: 30 }}
+          >
+            重置栏宽
+          </Button>
         </Stack>
         <Stack sx={{ mb: 1.5 }}>
           <Switch
@@ -869,6 +925,350 @@ function TemplatesTab(): React.ReactNode {
           </Field>
         </Modal>
       ) : null}
+    </Box>
+  )
+}
+
+const KIND_ICON: Record<string, typeof FileIcon> = {
+  image: ImageIcon,
+  pdf: PdfIcon,
+  doc: DocIcon,
+  archive: ZipIcon,
+  video: VideoIcon,
+  audio: AudioIcon,
+  other: FileIcon
+}
+
+const KIND_LABEL: Record<string, string> = {
+  all: '全部',
+  image: '图片',
+  pdf: 'PDF',
+  doc: '文档',
+  archive: '压缩包',
+  video: '视频',
+  audio: '音频',
+  other: '其他'
+}
+
+function humanSize(bytes: number): string {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value.toFixed(value < 10 && unit > 0 ? 1 : 0)} ${units[unit]}`
+}
+
+function AttachmentsTab(): React.ReactNode {
+  const theme = useTheme()
+  const t = useT()
+  const pushToast = useApp((s) => s.pushToast)
+  const [items, setItems] = useState<AttachmentRecord[]>([])
+  const [kind, setKind] = useState('all')
+  const [term, setTerm] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void api
+      .attachmentsAll(600)
+      .then((list) => setItems(list))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const filtered = items.filter(
+    (item) =>
+      (kind === 'all' || item.kind === kind) &&
+      (!term || item.filename.toLowerCase().includes(term.toLowerCase()))
+  )
+  const totalSize = filtered.reduce((sum, item) => sum + item.size, 0)
+
+  async function jumpToMessage(item: AttachmentRecord): Promise<void> {
+    const state = useApp.getState()
+    await state.selectAccount(item.accountId)
+    await state.selectFolder(item.folderId)
+    await state.openMessage(item.messageId)
+    state.closeSettings()
+  }
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+        <SectionTitle>{t('settings.attachments')}</SectionTitle>
+        <Box sx={{ flex: 1 }} />
+        <Typography variant="caption" color="text.secondary">
+          {filtered.length} 个文件 · 共 {humanSize(totalSize)}
+        </Typography>
+      </Box>
+
+      <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+        {Object.entries(KIND_LABEL).map(([value, label]) => (
+          <Chip
+            key={value}
+            size="small"
+            label={label}
+            variant={kind === value ? 'filled' : 'outlined'}
+            onClick={() => setKind(value)}
+            sx={{ cursor: 'pointer', borderRadius: 2 }}
+          />
+        ))}
+      </Stack>
+
+      <TextField
+        fullWidth
+        size="small"
+        placeholder="按文件名筛选"
+        value={term}
+        onChange={(e) => setTerm(e.target.value)}
+        sx={{ mb: 1.5 }}
+      />
+
+      <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
+        {loading ? (
+          <Typography variant="caption" color="text.secondary">
+            正在读取附件…
+          </Typography>
+        ) : filtered.length ? (
+          filtered.map((item) => {
+            const Icon = KIND_ICON[item.kind] ?? FileIcon
+            return (
+              <Paper
+                key={item.id}
+                elevation={0}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.25,
+                  p: 1.25,
+                  mb: 1,
+                  borderRadius: 2.5,
+                  bgcolor: alpha(theme.palette.text.primary, 0.03)
+                }}
+              >
+                <Icon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.filename}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {humanSize(item.size)} · {item.from} · {new Date(item.date).toLocaleDateString()}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {item.subject}
+                  </Typography>
+                </Box>
+                <Tooltip title="查看邮件" disableInteractive>
+                  <IconButton size="small" onClick={() => void jumpToMessage(item)} aria-label="查看邮件">
+                    <JumpIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="用系统程序打开" disableInteractive>
+                  <IconButton size="small" onClick={() => void api.attachmentOpen(item.id)} aria-label="打开">
+                    <OpenIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={async () => {
+                    const path = await api.attachmentSaveAs(item.id)
+                    if (path) pushToast('success', `已保存到 ${path}`)
+                  }}
+                  sx={{ borderRadius: 2, height: 26 }}
+                >
+                  另存为
+                </Button>
+              </Paper>
+            )
+          })
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            没有匹配的附件（附件在打开邮件正文后才会下载到本地）
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  )
+}
+
+function StatsTab(): React.ReactNode {
+  const theme = useTheme()
+  const t = useT()
+  const accounts = useApp((s) => s.accounts)
+  const [stats, setStats] = useState<StatsOverview | null>(null)
+
+  useEffect(() => {
+    void api.statsOverview().then(setStats)
+  }, [])
+
+  if (!stats) {
+    return (
+      <Typography variant="caption" color="text.secondary">
+        正在统计…
+      </Typography>
+    )
+  }
+
+  const maxReceived = Math.max(1, ...stats.received.map((p) => p.count))
+  const maxSent = Math.max(1, ...stats.sent.map((p) => p.count))
+  const maxBar = Math.max(maxReceived, maxSent)
+  const days = stats.received.map((p) => p.day)
+  const sentMap = new Map(stats.sent.map((p) => [p.day, p.count]))
+  const maxSender = Math.max(1, ...stats.topSenders.map((s) => s.count))
+  const maxAccount = Math.max(1, ...stats.perAccount.map((a) => a.total))
+
+  const card = (label: string, value: number | string) => (
+    <Paper
+      key={label}
+      elevation={0}
+      sx={{ flex: 1, p: 1.5, borderRadius: 2.5, bgcolor: alpha(theme.palette.text.primary, 0.03) }}
+    >
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography sx={{ fontSize: 20, fontWeight: 650, mt: 0.25 }}>{value}</Typography>
+    </Paper>
+  )
+
+  return (
+    <Box>
+      <SectionTitle>{t('settings.stats')}</SectionTitle>
+
+      <Stack direction="row" spacing={1.25} sx={{ mb: 2.5 }}>
+        {card('邮件总数', stats.total)}
+        {card('未读', stats.unread)}
+        {card('含附件', stats.withAttachments)}
+        {card('启用账户', stats.accounts)}
+      </Stack>
+
+      <SectionTitle>近 30 天收发趋势</SectionTitle>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: '3px',
+          height: 110,
+          p: 1,
+          borderRadius: 2.5,
+          bgcolor: alpha(theme.palette.text.primary, 0.03),
+          mb: 0.75
+        }}
+      >
+        {days.map((day) => {
+          const received = stats.received.find((p) => p.day === day)?.count ?? 0
+          const sent = sentMap.get(day) ?? 0
+          return (
+            <Tooltip
+              key={day}
+              title={`${new Date(day * 86400000).toLocaleDateString()} · 收 ${received} / 发 ${sent}`}
+              disableInteractive
+            >
+              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '2px', minWidth: 4 }}>
+                <Box
+                  sx={{
+                    height: `${Math.max(2, (sent / maxBar) * 80)}px`,
+                    bgcolor: alpha(theme.palette.text.primary, 0.35),
+                    borderRadius: 0.5
+                  }}
+                />
+                <Box
+                  sx={{
+                    height: `${Math.max(2, (received / maxBar) * 80)}px`,
+                    bgcolor: 'primary.main',
+                    borderRadius: 0.5
+                  }}
+                />
+              </Box>
+            </Tooltip>
+          )
+        })}
+      </Box>
+      <Typography variant="caption" color="text.secondary">
+        深色为发出，浅色为收到
+      </Typography>
+
+      <Box sx={{ mt: 2.5 }}>
+        <SectionTitle>最常联系</SectionTitle>
+        {stats.topSenders.length ? (
+          stats.topSenders.map((sender) => (
+            <Box key={sender.address} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 0.75 }}>
+              <Typography
+                variant="caption"
+                sx={{ width: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {sender.address}
+              </Typography>
+              <Box
+                sx={{
+                  flex: 1,
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: alpha(theme.palette.text.primary, 0.07),
+                  overflow: 'hidden'
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${(sender.count / maxSender) * 100}%`,
+                    height: '100%',
+                    bgcolor: 'primary.main',
+                    borderRadius: 4
+                  }}
+                />
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ width: 40, textAlign: 'right' }}>
+                {sender.count}
+              </Typography>
+            </Box>
+          ))
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            暂无数据
+          </Typography>
+        )}
+      </Box>
+
+      <Box sx={{ mt: 2.5 }}>
+        <SectionTitle>各账户邮件量</SectionTitle>
+        {stats.perAccount.map((account) => (
+          <Box key={account.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 0.75 }}>
+            <Typography variant="caption" sx={{ width: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {account.name}
+            </Typography>
+            <Box
+              sx={{
+                flex: 1,
+                height: 8,
+                borderRadius: 4,
+                bgcolor: alpha(theme.palette.text.primary, 0.07),
+                overflow: 'hidden'
+              }}
+            >
+              <Box
+                sx={{
+                  width: `${(account.total / maxAccount) * 100}%`,
+                  height: '100%',
+                  bgcolor: account.color || 'primary.main',
+                  borderRadius: 4
+                }}
+              />
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ width: 70, textAlign: 'right' }}>
+              {account.total} / 未读 {account.unread ?? 0}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2.5 }}>
+        统计基于本地已缓存的邮件（账户数：{accounts.length}）
+      </Typography>
     </Box>
   )
 }

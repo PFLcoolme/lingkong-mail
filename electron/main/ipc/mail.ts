@@ -2,6 +2,17 @@ import { app, BrowserWindow, dialog, shell } from 'electron'
 import { copyFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
+function attachmentKind(mime: string, filename: string): string {
+  const ext = (filename.split('.').pop() ?? '').toLowerCase()
+  if (mime.startsWith('image/')) return 'image'
+  if (mime === 'application/pdf' || ext === 'pdf') return 'pdf'
+  if (/^(zip|rar|7z|tar|gz|bz2|xz)$/.test(ext) || /zip|compressed/.test(mime)) return 'archive'
+  if (/^(docx?|xlsx?|pptx?|csv|txt|md|rtf)$/.test(ext)) return 'doc'
+  if (mime.startsWith('video/') || /^(mp4|mkv|avi|mov)$/.test(ext)) return 'video'
+  if (mime.startsWith('audio/') || /^(mp3|wav|flac|m4a)$/.test(ext)) return 'audio'
+  return 'other'
+}
+
 function escapeHtml(input: string): string {
   return input.replace(/[&<>"']/g, (c) => {
     switch (c) {
@@ -33,7 +44,7 @@ import { deleteDraft, listDrafts, saveDraft } from '../services/drafts'
 import { fetchMessageBody, markSeen, moveToFolder, removeMessages, toggleFlag } from '../services/actions'
 import { syncAccount, syncFolder, ewsClientFor } from '../services/sync'
 import { appendToSent, buildRawMessage, sendMail } from '../services/smtp'
-import { getDb } from '../services/db'
+import { getDb, parseJson } from '../services/db'
 import { recordAddresses } from '../services/contacts'
 import { getAttPath } from '../services/attachment-lookup'
 import { buildEml, emlFilename } from '../services/eml'
@@ -283,6 +294,108 @@ export function registerMailHandlers(): void {
   handle('search:delete', async (_event, id: string) => {
     deleteSavedSearch(id)
     return true
+  })
+
+  handle('attachments:all', async (_event, limit = 400) => {
+    const rows = getDb()
+      .prepare(
+        `SELECT a.id, a.message_id, a.filename, a.mime_type, a.size, a.path, a.inline,
+                m.subject, m.from_json, m.date, m.account_id, m.folder_id
+         FROM attachments a
+         JOIN messages m ON m.id = a.message_id
+         WHERE a.inline = 0
+         ORDER BY m.date DESC
+         LIMIT ?`
+      )
+      .all(limit) as {
+      id: string
+      message_id: string
+      filename: string
+      mime_type: string
+      size: number
+      path: string
+      inline: number
+      subject: string
+      from_json: string
+      date: number
+      account_id: string
+      folder_id: string
+    }[]
+    return rows.map((row) => ({
+      id: row.id,
+      messageId: row.message_id,
+      filename: row.filename,
+      mimeType: row.mime_type,
+      size: row.size,
+      path: row.path,
+      inline: row.inline === 1,
+      kind: attachmentKind(row.mime_type, row.filename),
+      subject: row.subject,
+      from: parseJson<{ name?: string; address: string }[]>(row.from_json, [])[0]?.address ?? '',
+      date: row.date,
+      accountId: row.account_id,
+      folderId: row.folder_id
+    }))
+  })
+
+  handle('stats:overview', async () => {
+    const db = getDb()
+    const one = (sql: string, ...args: unknown[]): number => {
+      const row = db.prepare(sql).get(...args) as { c: number } | undefined
+      return row?.c ?? 0
+    }
+    const total = one('SELECT COUNT(*) AS c FROM messages')
+    const unread = one('SELECT COUNT(*) AS c FROM messages WHERE seen = 0')
+    const withAttachments = one('SELECT COUNT(*) AS c FROM messages WHERE attachment_count > 0')
+    const accounts = one('SELECT COUNT(*) AS c FROM accounts WHERE enabled = 1')
+
+    const dayMs = 86400000
+    const seriesQuery = (folderType: string): { day: number; count: number }[] => {
+      const rows = db
+        .prepare(
+          `SELECT (m.date / ${dayMs}) AS day, COUNT(*) AS count
+           FROM messages m JOIN folders f ON f.id = m.folder_id
+           WHERE f.type = ?
+           GROUP BY day ORDER BY day DESC LIMIT 30`
+        )
+        .all(folderType) as { day: number; count: number }[]
+      return rows.reverse()
+    }
+
+    const recent = db
+      .prepare('SELECT from_json, account_id FROM messages ORDER BY date DESC LIMIT 600')
+      .all() as { from_json: string; account_id: string }[]
+    const senderMap = new Map<string, number>()
+    for (const row of recent) {
+      const list = parseJson<{ name?: string; address: string }[]>(row.from_json, [])
+      const address = list[0]?.address
+      if (!address) continue
+      senderMap.set(address, (senderMap.get(address) ?? 0) + 1)
+    }
+    const topSenders = [...senderMap.entries()]
+      .map(([address, count]) => ({ address, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+
+    const perAccount = db
+      .prepare(
+        `SELECT a.id, a.name, a.color, COUNT(m.id) AS total,
+                SUM(CASE WHEN m.seen = 0 THEN 1 ELSE 0 END) AS unread
+         FROM accounts a LEFT JOIN messages m ON m.account_id = a.id
+         GROUP BY a.id`
+      )
+      .all() as { id: string; name: string; color: string; total: number; unread: number }[]
+
+    return {
+      total,
+      unread,
+      withAttachments,
+      accounts,
+      received: seriesQuery('inbox'),
+      sent: seriesQuery('sent'),
+      topSenders,
+      perAccount
+    }
   })
 
   handle('message:export', async (_event, id: string) => {

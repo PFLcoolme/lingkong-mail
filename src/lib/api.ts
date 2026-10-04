@@ -1,11 +1,20 @@
 import type { AppApi, PickedFile, TestResult } from '@shared/api'
-import type { Contact, MainEvent, MessageSummary, Template } from '@shared/types'
+import type {
+  AttachmentRecord,
+  Contact,
+  MainEvent,
+  MessageSummary,
+  StatsOverview,
+  Template
+} from '@shared/types'
 
 type ExtraApi = {
   contactsSearch: (query: string, accountId?: string) => Promise<Contact[]>
   messageSummary: (id: string) => Promise<MessageSummary | null>
   messagesCount: (folderId: string) => Promise<number>
   messageExport: (id: string) => Promise<string | null>
+  attachmentsAll: (limit?: number) => Promise<AttachmentRecord[]>
+  statsOverview: () => Promise<StatsOverview>
   messagesExport: (ids: string[]) => Promise<{ dir: string; count: number } | null>
   messagePrint: (id: string) => Promise<boolean>
   templatesList: () => Promise<Template[]>

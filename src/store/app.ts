@@ -65,7 +65,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   alwaysLoadImages: false,
   sendDelaySeconds: 10,
   closeToTray: true,
-  openAtLogin: false
+  openAtLogin: false,
+  listDensity: 'comfortable',
+  listWidth: 404
 }
 
 interface AppState {
@@ -748,6 +750,15 @@ function handleEvent(event: MainEvent, set: SetState, get: () => AppState): void
     }
     case 'error': {
       get().pushToast('error', event.payload.message)
+      break
+    }
+    case 'compose-mailto': {
+      get().compose({
+        mode: 'new',
+        to: event.payload.to,
+        subject: event.payload.subject,
+        text: event.payload.body
+      })
       break
     }
     case 'accounts-changed': {
