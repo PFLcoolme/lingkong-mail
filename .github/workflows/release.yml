@@ -44,14 +44,15 @@ jobs:
       - name: Package (manual run, no publish)
         # yml 里存在 publish 配置，必须显式 --publish never，
         # 否则 electron-builder 仍会尝试建立 publisher 并因缺少 GH_TOKEN 报错
+        # tar.gz 供 Flathub 打包使用（见 packaging/flatpak/）
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        run: npx electron-builder --linux AppImage deb --x64 --publish never
+        run: npx electron-builder --linux AppImage deb tar.gz --x64 --publish never
 
       - name: Package and publish (tag push)
         # GH_TOKEN 由 Actions 提供；--publish always 会创建/更新对应 tag 的 Release
         # 并上传 latest-linux.yml（自动更新的版本清单）
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        run: npx electron-builder --linux AppImage deb --x64 --publish always
+        run: npx electron-builder --linux AppImage deb tar.gz --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -90,5 +91,6 @@ jobs:
           path: |
             dist/*.AppImage
             dist/*.deb
+            dist/*.tar.gz
             dist/latest-linux.yml
           if-no-files-found: warn

@@ -12,6 +12,9 @@ asar: true
 compression: maximum
 linux:
   executableName: kongling-mail
+  # 兜底产物名：tar.gz 这类没有独立配置段的 target 会用它
+  # （AppImage / deb 各自有专属段，优先级更高，不受此影响）
+  artifactName: kongling-mail-${version}-${arch}.${ext}
   category: Network;Email;
   desktop:
     entry:
@@ -37,8 +40,8 @@ appImage:
   artifactName: kongling-mail-${version}-${arch}.${ext}
 deb:
   artifactName: kongling-mail-${version}-${arch}.${ext}
-tarGz:
-  artifactName: kongling-mail-${version}-${arch}.${ext}
+# 注意：不要写顶层 tarGz: 段 —— electron-builder 的配置 schema 里没有这个键，
+# 会直接报 Invalid configuration object。tar.gz 的产物名由上面的 linux.artifactName 决定。
 # electron-updater 通过这里生成 app-update.yml / latest-linux.yml
 publish:
   provider: github
