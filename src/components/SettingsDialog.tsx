@@ -374,6 +374,11 @@ function GeneralTab(): React.ReactNode {
           <Switch checked={settings.trayEnabled} onChange={(v) => void update({ trayEnabled: v })} label="显示系统托盘图标（含未读提示，重启后生效）" />
           <Switch checked={settings.closeToTray} onChange={(v) => void update({ closeToTray: v })} label="关闭窗口时最小化到托盘（而不是退出程序）" />
           <Switch checked={settings.openAtLogin} onChange={(v) => void update({ openAtLogin: v })} label="开机自动启动" />
+          <Switch
+            checked={settings.syncDraftsToServer}
+            onChange={(v) => void update({ syncDraftsToServer: v })}
+            label="草稿同步到服务器草稿箱（换台设备也能看到草稿）"
+          />
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 1 }}>
             <Typography variant="caption" color="text.secondary">
               发送后撤销窗口（秒，0 = 立即发送）

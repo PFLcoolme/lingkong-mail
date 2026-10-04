@@ -3,7 +3,7 @@ import { app } from 'electron'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { SCHEMA } from './schema'
+import { SCHEMA, migrateSchema } from './schema'
 
 let db: Database.Database | null = null
 
@@ -25,6 +25,7 @@ export function initDatabase(): Database.Database {
   db.pragma('journal_mode = WAL')
   db.pragma('synchronous = NORMAL')
   db.exec(SCHEMA)
+  migrateSchema(db)
   return db
 }
 

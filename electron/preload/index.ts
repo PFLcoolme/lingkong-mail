@@ -76,6 +76,7 @@ const api: AppApi = {
   draftsList: (accountId) => invoke<Draft[]>('drafts:list', accountId),
   draftSave: (draft) => invoke<Draft>('draft:save', draft),
   draftDelete: (id) => invoke<void>('draft:delete', id),
+  draftSync: (id) => invoke<boolean>('draft:sync', id),
 
   search: (query) => invoke<SearchHit[]>('search', query),
 

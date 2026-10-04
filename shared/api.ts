@@ -89,6 +89,7 @@ export interface AppApi {
   draftsList(accountId: string): Promise<Draft[]>
   draftSave(draft: Partial<Draft>): Promise<Draft>
   draftDelete(id: string): Promise<void>
+  draftSync(id: string): Promise<boolean>
 
   /* ---------- 搜索 ---------- */
   search(query: SearchQuery): Promise<SearchHit[]>

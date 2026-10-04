@@ -129,7 +129,11 @@ CREATE TABLE IF NOT EXISTS drafts (
   reply_folder_id TEXT NOT NULL DEFAULT '',
   reply_uid INTEGER NOT NULL DEFAULT 0,
   attachments_json TEXT NOT NULL DEFAULT '[]',
-  updated_at INTEGER NOT NULL DEFAULT 0
+  updated_at INTEGER NOT NULL DEFAULT 0,
+  server_uid INTEGER NOT NULL DEFAULT 0,
+  server_folder_id TEXT NOT NULL DEFAULT '',
+  sync_state TEXT NOT NULL DEFAULT 'none',
+  synced_at INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_drafts_account ON drafts(account_id);
 
@@ -215,3 +219,25 @@ CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE ON messages BEGIN
           new.from_json || ' ' || new.to_json || ' ' || new.cc_json);
 END;
 `
+
+/**
+ * 为老版本数据库补齐新增列。
+ * SQLite 的 ADD COLUMN 不支持 IF NOT EXISTS，只能先查表结构再决定是否添加。
+ */
+export function migrateSchema(db: {
+  prepare: (sql: string) => { all: () => unknown[] }
+  exec: (sql: string) => void
+}): void {
+  const ensureColumn = (table: string, column: string, definition: string): void => {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+    if (!columns.some((item) => item.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+    }
+  }
+
+  // 草稿同步到服务器（v0.2.3 起）
+  ensureColumn('drafts', 'server_uid', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn('drafts', 'server_folder_id', "TEXT NOT NULL DEFAULT ''")
+  ensureColumn('drafts', 'sync_state', "TEXT NOT NULL DEFAULT 'none'")
+  ensureColumn('drafts', 'synced_at', 'INTEGER NOT NULL DEFAULT 0')
+}

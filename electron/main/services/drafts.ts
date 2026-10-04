@@ -1,4 +1,4 @@
-import type { Draft } from '@shared/types'
+import type { Draft, DraftSyncState } from '@shared/types'
 import { generateId, getDb, now, parseJson } from './db'
 
 interface DraftRow {
@@ -16,6 +16,10 @@ interface DraftRow {
   reply_uid: number
   attachments_json: string
   updated_at: number
+  server_uid: number
+  server_folder_id: string
+  sync_state: string
+  synced_at: number
 }
 
 function rowToDraft(row: DraftRow): Draft {
@@ -35,7 +39,11 @@ function rowToDraft(row: DraftRow): Draft {
     replyUid: row.reply_uid,
     attachments: stored.attachments ?? [],
     forwardAttachments: stored.forward ?? [],
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    serverUid: row.server_uid ?? 0,
+    serverFolderId: row.server_folder_id ?? '',
+    syncState: (row.sync_state as DraftSyncState) || 'none',
+    syncedAt: row.synced_at ?? 0
   }
 }
 
@@ -45,6 +53,11 @@ export function listDrafts(accountId?: string): Draft[] {
     ? (db.prepare('SELECT * FROM drafts WHERE account_id = ? ORDER BY updated_at DESC').all(accountId) as DraftRow[])
     : (db.prepare('SELECT * FROM drafts ORDER BY updated_at DESC').all() as DraftRow[])
   return rows.map(rowToDraft)
+}
+
+export function getDraft(id: string): Draft | null {
+  const row = getDb().prepare('SELECT * FROM drafts WHERE id = ?').get(id) as DraftRow | undefined
+  return row ? rowToDraft(row) : null
 }
 
 export function saveDraft(draft: Partial<Draft>): Draft {
@@ -75,7 +88,9 @@ export function saveDraft(draft: Partial<Draft>): Draft {
       `UPDATE drafts SET account_id=@account_id, to_text=@to_text, cc_text=@cc_text, bcc_text=@bcc_text,
         subject=@subject, body_text=@body_text, body_html=@body_html, in_reply_to=@in_reply_to,
         "references"=@references, reply_folder_id=@reply_folder_id, reply_uid=@reply_uid,
-        attachments_json=@attachments_json, updated_at=@updated_at WHERE id=@id`
+        attachments_json=@attachments_json, updated_at=@updated_at,
+        sync_state = CASE WHEN sync_state = 'synced' THEN 'pending' ELSE sync_state END
+        WHERE id=@id`
     ).run(params)
   } else {
     db.prepare(
@@ -90,4 +105,26 @@ export function saveDraft(draft: Partial<Draft>): Draft {
 
 export function deleteDraft(id: string): void {
   getDb().prepare('DELETE FROM drafts WHERE id = ?').run(id)
+}
+
+/** 更新草稿与服务器的同步状态 */
+export function setDraftSync(
+  id: string,
+  patch: { state: DraftSyncState; serverUid?: number; serverFolderId?: string; syncedAt?: number }
+): void {
+  getDb()
+    .prepare(
+      `UPDATE drafts SET sync_state = @state,
+        server_uid = COALESCE(@serverUid, server_uid),
+        server_folder_id = COALESCE(@serverFolderId, server_folder_id),
+        synced_at = COALESCE(@syncedAt, synced_at)
+      WHERE id = @id`
+    )
+    .run({
+      id,
+      state: patch.state,
+      serverUid: patch.serverUid ?? null,
+      serverFolderId: patch.serverFolderId ?? null,
+      syncedAt: patch.syncedAt ?? null
+    })
 }

@@ -224,6 +224,9 @@ export interface Rule {
   actions: RuleAction[]
 }
 
+/** 草稿与服务器同步的状态 */
+export type DraftSyncState = 'none' | 'pending' | 'synced' | 'error'
+
 export interface Draft {
   id: string
   accountId: string
@@ -240,6 +243,12 @@ export interface Draft {
   forwardAttachments: string[]
   attachments: string[]
   updatedAt: number
+  /** 服务器上对应草稿的 UID（0 表示尚未上传） */
+  serverUid: number
+  /** 服务器草稿所在文件夹 id */
+  serverFolderId: string
+  syncState: DraftSyncState
+  syncedAt: number
 }
 
 export interface SendPayload {
@@ -254,11 +263,18 @@ export interface SendPayload {
   inReplyTo: string
   references: string
   saveToSent: boolean
+  /** 由草稿发送时携带，发送成功后需要清理该草稿（含服务器副本） */
+  draftId?: string
 }
+
+/** 统一收件箱的虚拟文件夹 id：跨账户聚合所有收件箱 */
+export const UNIFIED_INBOX_ID = '__unified_inbox__'
 
 export interface ListQuery {
   accountId: string
   folderId: string
+  /** 提供时按多个文件夹聚合查询（统一收件箱用），此时忽略 folderId */
+  folderIds?: string[]
   labelId?: string
   limit: number
   offset: number
@@ -319,6 +335,7 @@ export type MainEvent =
   | { type: 'toast'; payload: { level: 'info' | 'success' | 'error'; message: string } }
   | { type: 'compose-mailto'; payload: { to: string; subject: string; body: string } }
   | { type: 'lock-now'; payload: Record<string, never> }
+  | { type: 'drafts-changed'; payload: null }
 
 export interface AppSettings {
   theme: 'system' | 'light' | 'dark'
@@ -351,6 +368,7 @@ export interface AppSettings {
   sendDelaySeconds: number
   /** 关闭主窗口时最小化到托盘而不是退出 */
   closeToTray: boolean
+  syncDraftsToServer: boolean
   /** 开机自动启动 */
   openAtLogin: boolean
   /** 邮件列表密度 */

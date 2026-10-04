@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api, onMainEvent, type PickedFile } from '@/lib/api'
+import { UNIFIED_INBOX_ID } from '@shared/types'
 import { buildQuote, parseAddressInput } from '@/lib/format'
 import { translateStatic } from '@/lib/i18n'
 import type {
@@ -67,6 +68,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   alwaysLoadImages: false,
   sendDelaySeconds: 10,
   closeToTray: false,
+  syncDraftsToServer: true,
   openAtLogin: false,
   listDensity: 'comfortable',
   listWidth: 404
@@ -81,6 +83,10 @@ interface AppState {
   loadingMore: boolean
   activeAccountId: string
   activeFolderId: string
+  /** 统一收件箱涵盖的文件夹 id（各账户的收件箱） */
+  unifiedFolderIds: string[]
+  /** 统一收件箱的未读总数 */
+  unifiedUnread: number
   selectedId: string | null
   current: Message | null
   unreadOnly: boolean
@@ -119,6 +125,7 @@ interface AppState {
   refreshAccounts: () => Promise<void>
   selectAccount: (id: string) => Promise<void>
   selectFolder: (id: string) => Promise<void>
+  selectUnifiedInbox: () => Promise<void>
   reloadMessages: () => Promise<void>
   loadMoreMessages: () => Promise<void>
   openMessage: (id: string) => Promise<void>
@@ -189,6 +196,8 @@ export const useApp = create<AppState>((set, get) => ({
   loadingMore: false,
   activeAccountId: '',
   activeFolderId: '',
+  unifiedFolderIds: [],
+  unifiedUnread: 0,
   selectedId: null,
   current: null,
   unreadOnly: false,
@@ -394,15 +403,47 @@ export const useApp = create<AppState>((set, get) => ({
     await get().reloadMessages()
   },
 
+  /** 进入统一收件箱：聚合所有账户的收件箱 */
+  async selectUnifiedInbox() {
+    set({
+      activeFolderId: UNIFIED_INBOX_ID,
+      activeAccountId: '',
+      activeLabelId: '',
+      selectedId: null,
+      current: null,
+      filterQuery: '',
+      searchTerm: '',
+      searchResults: null
+    })
+    const accountIds = get().accounts.map((a) => a.id)
+    const lists = await Promise.all(accountIds.map((id) => api.foldersList(id).catch(() => [])))
+    const inboxes = lists.flat().filter((folder) => folder.type === 'inbox')
+    set({
+      unifiedFolderIds: inboxes.map((folder) => folder.id),
+      unifiedUnread: inboxes.reduce((sum, folder) => sum + folder.unread, 0)
+    })
+    await get().reloadMessages()
+  },
+
   async reloadMessages() {
-    const { activeAccountId, activeFolderId, unreadOnly, withAttachments, filterQuery, activeLabelId } = get()
+    const {
+      activeAccountId,
+      activeFolderId,
+      unreadOnly,
+      withAttachments,
+      filterQuery,
+      activeLabelId,
+      unifiedFolderIds
+    } = get()
     if (!activeFolderId && !activeLabelId) return
+    const unified = activeFolderId === UNIFIED_INBOX_ID
     set({ loadingMessages: true })
     try {
       const pageSize = 120
       const messages = await api.messagesList({
-        accountId: activeLabelId ? '' : activeAccountId,
-        folderId: activeLabelId ? '' : activeFolderId,
+        accountId: unified || activeLabelId ? '' : activeAccountId,
+        folderId: unified || activeLabelId ? '' : activeFolderId,
+        folderIds: unified ? unifiedFolderIds : undefined,
         labelId: activeLabelId || undefined,
         limit: pageSize,
         offset: 0,
@@ -430,9 +471,11 @@ export const useApp = create<AppState>((set, get) => ({
     set({ loadingMore: true })
     try {
       const pageSize = 120
+      const unified = state.activeFolderId === UNIFIED_INBOX_ID
       const more = await api.messagesList({
-        accountId: state.activeAccountId,
-        folderId: state.activeFolderId,
+        accountId: unified ? '' : state.activeAccountId,
+        folderId: unified ? '' : state.activeFolderId,
+        folderIds: unified ? state.unifiedFolderIds : undefined,
         limit: pageSize,
         offset: state.messages.length,
         unreadOnly: state.unreadOnly,
@@ -506,7 +549,27 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async syncNow(full = false) {
-    const { activeAccountId, activeFolderId } = get()
+    const { activeAccountId, activeFolderId, accounts } = get()
+    if (activeFolderId === UNIFIED_INBOX_ID) {
+      // 统一收件箱：逐个账户同步其收件箱
+      set({ syncing: {} })
+      const inboxes: { accountId: string; folderId: string }[] = []
+      for (const account of accounts) {
+        const folders = await api.foldersList(account.id).catch(() => [])
+        const inbox = folders.find((folder) => folder.type === 'inbox')
+        if (inbox) inboxes.push({ accountId: account.id, folderId: inbox.id })
+      }
+      try {
+        await Promise.all(
+          inboxes.map(({ accountId, folderId }) => api.messagesSync(accountId, folderId, full))
+        )
+        await get().selectUnifiedInbox()
+        get().pushToast('success', tr('toast.synced'))
+      } catch (error) {
+        get().pushToast('error', error instanceof Error ? error.message : '同步失败')
+      }
+      return
+    }
     if (!activeAccountId) return
     try {
       await api.messagesSync(activeAccountId, activeFolderId, full)
@@ -648,7 +711,8 @@ export const useApp = create<AppState>((set, get) => ({
       attachments: composer.attachments.map((a) => ({ filename: a.filename, path: a.path })),
       inReplyTo: composer.inReplyTo,
       references: composer.references,
-        saveToSent: true
+      saveToSent: true,
+      draftId: composer.draftId
       },
       options
     )
@@ -791,6 +855,12 @@ function escapeHtml(input: string): string {
   })
 }
 
+/** 事件里的文件夹是否属于当前视图（统一收件箱需判断集合成员） */
+function isActiveFolder(state: AppState, folderId: string): boolean {
+  if (folderId === state.activeFolderId) return true
+  return state.activeFolderId === UNIFIED_INBOX_ID && state.unifiedFolderIds.includes(folderId)
+}
+
 function resolveTheme(theme: AppSettings['theme']): 'light' | 'dark' {
   if (theme === 'system') {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -814,13 +884,13 @@ function handleEvent(event: MainEvent, set: SetState, get: () => AppState): void
       break
     }
     case 'messages-changed': {
-      if (event.payload.folderId === get().activeFolderId) {
+      if (isActiveFolder(get(), event.payload.folderId)) {
         void get().reloadMessages()
       }
       break
     }
     case 'new-message': {
-      if (event.payload.folderId === get().activeFolderId) {
+      if (isActiveFolder(get(), event.payload.folderId)) {
         void get().reloadMessages()
       }
       break
@@ -835,6 +905,10 @@ function handleEvent(event: MainEvent, set: SetState, get: () => AppState): void
     }
     case 'lock-now': {
       if (get().lockEnabled) set({ locked: true, translation: '' })
+      break
+    }
+    case 'drafts-changed': {
+      void get().loadDrafts()
       break
     }
     case 'update-state': {

@@ -1,7 +1,7 @@
 {
   "name": "kongling-mail",
   "productName": "空灵邮箱",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "适用于 Linux 的本地桌面邮箱管理客户端",
   "main": "out/main/index.js",
   "author": "cool",

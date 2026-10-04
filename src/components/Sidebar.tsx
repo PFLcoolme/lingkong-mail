@@ -27,6 +27,10 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRightRounded'
 import EditIcon from '@mui/icons-material/EditRounded'
 import SyncIcon from '@mui/icons-material/SyncRounded'
 import AddIcon from '@mui/icons-material/AddRounded'
+import AllInboxIcon from '@mui/icons-material/AllInboxRounded'
+import CloudDoneIcon from '@mui/icons-material/CloudDoneRounded'
+import CloudOffIcon from '@mui/icons-material/CloudOffRounded'
+import CloudSyncIcon from '@mui/icons-material/CloudSyncRounded'
 import ErrorIcon from '@mui/icons-material/ErrorOutlineRounded'
 import SettingsIcon from '@mui/icons-material/SettingsOutlined'
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSendRounded'
@@ -35,7 +39,7 @@ import BookmarkIcon from '@mui/icons-material/BookmarkBorderRounded'
 import SendNowIcon from '@mui/icons-material/SendRounded'
 import WakeIcon from '@mui/icons-material/NotificationsActiveRounded'
 import CancelIcon from '@mui/icons-material/CloseRounded'
-import type { FolderType } from '@shared/types'
+import { UNIFIED_INBOX_ID, type FolderType } from '@shared/types'
 import { useApp } from '@/store/app'
 import { Avatar } from './ui'
 import { useT } from '@/lib/i18n'
@@ -60,6 +64,8 @@ export default function Sidebar(): React.ReactNode {
   const activeFolderId = useApp((s) => s.activeFolderId)
   const selectAccount = useApp((s) => s.selectAccount)
   const selectFolder = useApp((s) => s.selectFolder)
+  const selectUnifiedInbox = useApp((s) => s.selectUnifiedInbox)
+  const unifiedUnread = useApp((s) => s.unifiedUnread)
   const syncNow = useApp((s) => s.syncNow)
   const openSettings = useApp((s) => s.openSettings)
   const openWizard = useApp((s) => s.openWizard)
@@ -147,6 +153,26 @@ export default function Sidebar(): React.ReactNode {
       </Box>
 
       <Box sx={{ flex: 1, overflowY: 'auto', pb: 1 }}>
+        <List dense disablePadding sx={{ px: 1 }}>
+          <ListItemButton
+            selected={activeFolderId === UNIFIED_INBOX_ID}
+            onClick={() => void selectUnifiedInbox()}
+            disabled={accounts.length < 2}
+            sx={{ py: 0.6, minHeight: 36, borderRadius: 1.5 }}
+          >
+            <ListItemIcon sx={{ minWidth: 30 }}>
+              <AllInboxIcon sx={{ fontSize: 19 }} />
+            </ListItemIcon>
+            <ListItemText
+              primary={t('sidebar.unifiedInbox')}
+              slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 500 } } }}
+            />
+            {unifiedUnread ? (
+              <Chip size="small" label={unifiedUnread} sx={{ height: 18, fontSize: 11 }} />
+            ) : null}
+          </ListItemButton>
+        </List>
+
         {sectionHeader(
           `${t('sidebar.accounts')} ${accounts.length}`,
           accountsOpen,
@@ -430,6 +456,19 @@ export default function Sidebar(): React.ReactNode {
                       }
                     }}
                   />
+                  {draft.syncState === 'synced' ? (
+                    <Tooltip title="已同步到服务器草稿箱" disableInteractive>
+                      <CloudDoneIcon sx={{ fontSize: 15, color: 'success.main', flexShrink: 0 }} />
+                    </Tooltip>
+                  ) : draft.syncState === 'error' ? (
+                    <Tooltip title="同步到服务器失败，重新保存草稿即可重试" disableInteractive>
+                      <CloudOffIcon sx={{ fontSize: 15, color: 'warning.main', flexShrink: 0 }} />
+                    </Tooltip>
+                  ) : draft.syncState === 'pending' ? (
+                    <Tooltip title="等待同步到服务器" disableInteractive>
+                      <CloudSyncIcon sx={{ fontSize: 15, color: 'text.disabled', flexShrink: 0 }} />
+                    </Tooltip>
+                  ) : null}
                 </ListItemButton>
               ))}
             </List>

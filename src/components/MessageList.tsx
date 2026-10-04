@@ -25,7 +25,7 @@ import MarkReadIcon from '@mui/icons-material/DraftsRounded'
 import DeleteIcon from '@mui/icons-material/DeleteOutlineRounded'
 import SearchIcon from '@mui/icons-material/SearchRounded'
 import FilterAltIcon from '@mui/icons-material/FilterAltRounded'
-import type { MessageSummary, SearchHit } from '@shared/types'
+import { UNIFIED_INBOX_ID, type MessageSummary, type SearchHit } from '@shared/types'
 import { useApp } from '@/store/app'
 import { Avatar, EmptyState, Spinner } from './ui'
 import { formatDate, shortAddress } from '@/lib/format'
@@ -53,6 +53,14 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
   const moveTo = useApp((s) => s.moveTo)
   const folders = useApp((s) => s.folders)
   const selectAccount = useApp((s) => s.selectAccount)
+  const accounts = useApp((s) => s.accounts)
+  const activeFolderId = useApp((s) => s.activeFolderId)
+  // 统一收件箱下，同一列表里混有多个账户的邮件，需要标出归属
+  const unifiedMode = activeFolderId === UNIFIED_INBOX_ID
+  const accountOf = (accountId: string): { name: string; color: string } | undefined => {
+    const account = accounts.find((a) => a.id === accountId)
+    return account ? { name: account.name || account.email, color: account.color } : undefined
+  }
   const selectFolder = useApp((s) => s.selectFolder)
   const showSnippet = useApp((s) => s.settings.showSnippet)
   const hasMore = useApp((s) => s.hasMoreMessages)
@@ -385,7 +393,25 @@ export default function MessageList({ layout = 'row' }: { layout?: 'row' | 'colu
                     slotProps={{ input: { 'aria-label': '选择邮件' } }}
                   />
                 </Box>
-                <Avatar name={item.from[0]?.name || item.from[0]?.address || '?'} size={compact ? 24 : 32} />
+                <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                  <Avatar name={item.from[0]?.name || item.from[0]?.address || '?'} size={compact ? 24 : 32} />
+                  {unifiedMode && accountOf(item.accountId) ? (
+                    <Tooltip title={accountOf(item.accountId)?.name ?? ''} disableInteractive>
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          right: -2,
+                          bottom: -2,
+                          width: 9,
+                          height: 9,
+                          borderRadius: '50%',
+                          bgcolor: accountOf(item.accountId)?.color ?? 'primary.main',
+                          border: `1.5px solid ${theme.palette.background.paper}`
+                        }}
+                      />
+                    </Tooltip>
+                  ) : null}
+                </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                     <Typography

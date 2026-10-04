@@ -40,7 +40,8 @@ import {
   refreshFolderStats,
   searchMessages
 } from '../services/messages'
-import { deleteDraft, listDrafts, saveDraft } from '../services/drafts'
+import { deleteDraft, getDraft, listDrafts, saveDraft } from '../services/drafts'
+import { removeServerDraft, uploadDraft } from '../services/draft-sync'
 import { fetchMessageBody, markSeen, moveToFolder, removeMessages, toggleFlag } from '../services/actions'
 import { syncAccount, syncFolder, ewsClientFor } from '../services/sync'
 import { appendToSent, buildRawMessage, sendMail } from '../services/smtp'
@@ -63,6 +64,14 @@ import { deliverOutboxItem } from '../scheduler'
 import { getMainWindow } from '../window'
 import { DEFAULT_SETTINGS as DEFAULTS } from '../settings-defaults'
 import { settingsGet } from '../services/accounts'
+
+/** 草稿保存后按设置同步到服务器草稿箱，完成后通知界面刷新 */
+async function syncDraftIfEnabled(draftId: string): Promise<void> {
+  const settings = { ...DEFAULTS, ...settingsGet<Partial<typeof DEFAULTS>>('app', {}) }
+  if (!settings.syncDraftsToServer) return
+  await uploadDraft(draftId)
+  emit({ type: 'drafts-changed', payload: null })
+}
 
 export function registerMailHandlers(): void {
   handle('messages:list', async (_event, query: ListQuery) => listMessages(query))
@@ -176,17 +185,34 @@ export function registerMailHandlers(): void {
       [...payload.to, ...payload.cc].map((address) => ({ address }))
     )
     void syncAccount(account.id).catch(() => undefined)
+    // 邮件已发出，本地草稿与服务器草稿箱里的副本都不再需要
+    if (payload.draftId) {
+      const draft = getDraft(payload.draftId)
+      deleteDraft(payload.draftId)
+      if (draft) void removeServerDraft(draft)
+      emit({ type: 'drafts-changed', payload: null })
+    }
     return { scheduled: false }
   })
 
   handle('drafts:list', async (_event, accountId: string) => listDrafts(accountId))
 
-  handle('draft:save', async (_event, draft: Partial<Draft>) => saveDraft(draft))
+  handle('draft:save', async (_event, draft: Partial<Draft>) => {
+    const saved = saveDraft(draft)
+    void syncDraftIfEnabled(saved.id)
+    return saved
+  })
 
   handle('draft:delete', async (_event, id: string) => {
+    const draft = getDraft(id)
     deleteDraft(id)
+    // 服务器上的副本一并清掉，否则再同步时草稿箱会冒出幽灵草稿
+    if (draft) void removeServerDraft(draft)
+    emit({ type: 'drafts-changed', payload: null })
     return true
   })
+
+  handle('draft:sync', async (_event, id: string) => uploadDraft(id))
 
   handle('search', async (_event, query: SearchQuery) => searchMessages(query))
 

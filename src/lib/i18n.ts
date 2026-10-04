@@ -26,6 +26,7 @@ const DICT: Record<string, Entry> = {
   'compose.hint': { 'zh-CN': 'Ctrl + Enter 快速发送', en: 'Ctrl + Enter to send' },
 
   'sidebar.accounts': { 'zh-CN': '账户', en: 'Accounts' },
+  'sidebar.unifiedInbox': { 'zh-CN': '全部收件箱', en: 'All Inboxes' },
   'sidebar.otherFolders': { 'zh-CN': '其他文件夹', en: 'Other folders' },
   'sidebar.drafts': { 'zh-CN': '本地草稿', en: 'Local drafts' },
   'sidebar.sync': { 'zh-CN': '同步', en: 'Sync' },

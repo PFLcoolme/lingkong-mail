@@ -285,7 +285,12 @@ export function listMessages(query: ListQuery): MessageSummary[] {
     where.push('m.account_id = ?')
     params.push(query.accountId)
   }
-  if (query.folderId) {
+  if (query.folderIds) {
+    // 聚合查询（统一收件箱）：空数组时不应退化成「查全部」，而是明确查不到任何邮件
+    if (!query.folderIds.length) return []
+    where.push(`m.folder_id IN (${query.folderIds.map(() => '?').join(', ')})`)
+    params.push(...query.folderIds)
+  } else if (query.folderId) {
     where.push('m.folder_id = ?')
     params.push(query.folderId)
   }
