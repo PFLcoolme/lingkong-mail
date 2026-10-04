@@ -15,7 +15,9 @@
     "rebuild": "electron-builder install-app-deps",
     "dist": "npm run build && electron-builder --linux AppImage",
     "dist:deb": "npm run build && electron-builder --linux deb",
-    "dist:all": "npm run build && electron-builder --linux AppImage deb"
+    "dist:all": "npm run build && electron-builder --linux AppImage deb",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -32,6 +34,7 @@
     "nodemailer": "^10.0.13",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "vitest": "^5.0.3",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
