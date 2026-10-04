@@ -31,7 +31,7 @@ options=('!strip' '!debug')
 source=(
   "kongling-mail-${pkgver}.AppImage::https://github.com/PFLcoolme/lingkong-mail/releases/download/v${pkgver}/kongling-mail-${pkgver}-x86_64.AppImage"
 )
-sha256sums=('PLACEHOLDER_REPLACE_WITH_REAL_SHA256')
+sha256sums=('a249a24ea355da6a6ace4fd834683f3504cf2916baa408e25a058f8717240646')
 
 prepare() {
   chmod +x "kongling-mail-${pkgver}.AppImage"

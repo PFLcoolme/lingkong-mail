@@ -21,6 +21,6 @@ pkgbase = kongling-mail-bin
 	provides = kongling-mail
 	conflicts = kongling-mail
 	source = kongling-mail-0.2.3.AppImage::https://github.com/PFLcoolme/lingkong-mail/releases/download/v0.2.3/kongling-mail-0.2.3-x86_64.AppImage
-	sha256sums = PLACEHOLDER_REPLACE_WITH_REAL_SHA256
+	sha256sums = a249a24ea355da6a6ace4fd834683f3504cf2916baa408e25a058f8717240646
 
 pkgname = kongling-mail-bin
