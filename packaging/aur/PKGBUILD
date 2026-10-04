@@ -1,0 +1,72 @@
+# Maintainer: cool <tuooiwc@foxmail.com>
+pkgname=kongling-mail-bin
+pkgver=0.2.3
+pkgrel=1
+pkgdesc='本地桌面邮箱管理客户端，支持 IMAP/SMTP/POP3/OAuth2/Exchange'
+arch=('x86_64')
+url='https://github.com/PFLcoolme/lingkong-mail'
+license=('MIT')
+depends=(
+  'gtk3'
+  'nss'
+  'libxss'
+  'libxtst'
+  'libsecret'
+  'libnotify'
+  'xdg-utils'
+  'at-spi2-core'
+  'util-linux'
+  'libcups'
+  'gcc-libs'
+)
+optdepends=(
+  'libappindicator-gtk3: 系统托盘图标与未读角标'
+  'noto-fonts-cjk: 中文界面字体'
+)
+provides=('kongling-mail')
+conflicts=('kongling-mail')
+# Electron 的可执行文件与资源不能被 strip / 重新链接
+options=('!strip' '!debug')
+
+source=(
+  "kongling-mail-${pkgver}.AppImage::https://github.com/PFLcoolme/lingkong-mail/releases/download/v${pkgver}/kongling-mail-${pkgver}-x86_64.AppImage"
+)
+sha256sums=('PLACEHOLDER_REPLACE_WITH_REAL_SHA256')
+
+prepare() {
+  chmod +x "kongling-mail-${pkgver}.AppImage"
+  # AppImage 自带解包能力，不依赖 FUSE；产物为 squashfs-root/
+  "./kongling-mail-${pkgver}.AppImage" --appimage-extract > /dev/null
+}
+
+package() {
+  # 上游 AppImage 的目录布局已经是「可执行文件 + resources/」，整份搬进 /opt 即可
+  install -d "${pkgdir}/opt/kongling-mail"
+  cp -a squashfs-root/. "${pkgdir}/opt/kongling-mail/"
+
+  # 以下文件在安装到系统的场景下冗余：
+  #   AppRun / .DirIcon 是 AppImage 自身的启动器与图标链接
+  #   desktop 与图标改由 pacman 安装到标准位置（见下）
+  rm -f "${pkgdir}/opt/kongling-mail/AppRun" \
+        "${pkgdir}/opt/kongling-mail/.DirIcon" \
+        "${pkgdir}/opt/kongling-mail/kongling-mail.desktop" \
+        "${pkgdir}/opt/kongling-mail/kongling-mail.png"
+
+  # 上游 desktop 为 `Exec=AppRun --no-sandbox`，此处两点改动：
+  #   1. 改为直接调用 /opt 下的可执行文件
+  #   2. 去掉 --no-sandbox，保留 Chromium 沙箱（Arch 默认允许非特权用户命名空间）
+  # 同时移除只对 AppImage 有意义的 X-AppImage-Version
+  install -Dm644 squashfs-root/kongling-mail.desktop \
+    "${pkgdir}/usr/share/applications/kongling-mail.desktop"
+  sed -i \
+    -e 's|^Exec=.*|Exec=/opt/kongling-mail/kongling-mail %U|' \
+    -e '/^X-AppImage-Version=/d' \
+    "${pkgdir}/usr/share/applications/kongling-mail.desktop"
+
+  install -Dm644 squashfs-root/kongling-mail.png \
+    "${pkgdir}/usr/share/icons/hicolor/512x512/apps/kongling-mail.png"
+
+  # 供桌面环境与命令行调用；上游 deb 也是通过 /usr/bin 暴露入口
+  install -d "${pkgdir}/usr/bin"
+  ln -s /opt/kongling-mail/kongling-mail "${pkgdir}/usr/bin/kongling-mail"
+}

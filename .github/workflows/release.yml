@@ -64,6 +64,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Print package checksums
+        # AUR 的 PKGBUILD 与 Flatpak 清单都需要安装包的 sha256。
+        # 在这里直接对刚打好的产物求值并写进构建摘要，省去本地下载上百 MB 的包。
+        if: always()
+        run: |
+          {
+            echo '### 安装包校验和'
+            echo ''
+            echo '```'
+            for f in dist/*.AppImage dist/*.deb dist/*.tar.gz; do
+              if [ -e "$f" ]; then sha256sum "$f"; fi
+            done
+            echo '```'
+            echo ''
+            echo '将上述 sha256 填入 `packaging/aur/PKGBUILD` 与'
+            echo '`packaging/flatpak/com.kongling.mail.yml` 后提交。'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload artifacts to workflow run
         if: always()
         uses: actions/upload-artifact@v4

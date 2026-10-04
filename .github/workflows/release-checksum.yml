@@ -1,0 +1,49 @@
+name: Compute release checksums
+
+# 用途：为 AUR 的 PKGBUILD 与 Flatpak 清单补齐【已发布】安装包的 sha256。
+#
+# 为什么不在本地或随发布流程一起算：
+#   electron-builder 的产物并非完全可重现 —— 重新构建一次得到的文件与原文件
+#   校验和并不相同，因此必须对 Release 里已经上传的那份资产求值，不能拿新构建的顶替。
+#   在 Actions 里下载比本地快得多，也省掉上百 MB 的本地流量。
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 要计算校验和的 Release 标签（例如 v0.2.3）
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  checksum:
+    name: Compute sha256 for ${{ inputs.tag }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download release assets
+        run: |
+          mkdir -p assets
+          gh release download "${{ inputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern 'kongling-mail-*' \
+            --dir assets
+          ls -la assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute and publish sha256
+        run: |
+          {
+            echo "### ${{ inputs.tag }} 安装包校验和"
+            echo ''
+            echo '```'
+            sha256sum assets/* | sed 's|assets/||'
+            echo '```'
+            echo ''
+            echo '填写位置：`packaging/aur/PKGBUILD` 的 `sha256sums`、'
+            echo '`packaging/flatpak/com.kongling.mail.yml` 中 tar.gz 源的 `sha256`。'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo '--- 控制台输出 ---'
+          sha256sum assets/* | sed 's|assets/||'

@@ -1,0 +1,26 @@
+pkgbase = kongling-mail-bin
+	pkgdesc = 本地桌面邮箱管理客户端，支持 IMAP/SMTP/POP3/OAuth2/Exchange
+	pkgver = 0.2.3
+	pkgrel = 1
+	url = https://github.com/PFLcoolme/lingkong-mail
+	arch = x86_64
+	license = MIT
+	depends = gtk3
+	depends = nss
+	depends = libxss
+	depends = libxtst
+	depends = libsecret
+	depends = libnotify
+	depends = xdg-utils
+	depends = at-spi2-core
+	depends = util-linux
+	depends = libcups
+	depends = gcc-libs
+	optdepends = libappindicator-gtk3: 系统托盘图标与未读角标
+	optdepends = noto-fonts-cjk: 中文界面字体
+	provides = kongling-mail
+	conflicts = kongling-mail
+	source = kongling-mail-0.2.3.AppImage::https://github.com/PFLcoolme/lingkong-mail/releases/download/v0.2.3/kongling-mail-0.2.3-x86_64.AppImage
+	sha256sums = PLACEHOLDER_REPLACE_WITH_REAL_SHA256
+
+pkgname = kongling-mail-bin

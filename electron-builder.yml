@@ -27,11 +27,17 @@ linux:
     - target: deb
       arch:
         - x64
+    # tar.gz 供 Flatpak / Flathub 打包使用（清单见 packaging/flatpak/）
+    - target: tar.gz
+      arch:
+        - x64
 appImage:
   # 资产名必须与 latest-linux.yml 中记录的一致，自动更新才能定位到安装包；
   # 用中文 productName 会让下载链接变成一长串百分号编码，故固定为英文名
   artifactName: kongling-mail-${version}-${arch}.${ext}
 deb:
+  artifactName: kongling-mail-${version}-${arch}.${ext}
+tarGz:
   artifactName: kongling-mail-${version}-${arch}.${ext}
 # electron-updater 通过这里生成 app-update.yml / latest-linux.yml
 publish:
