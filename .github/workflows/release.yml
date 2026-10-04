@@ -57,8 +57,10 @@ jobs:
 
       - name: Tidy release title and notes
         if: startsWith(github.ref, 'refs/tags/')
-        # electron-builder 建出的 Release 标题即 tag 名且没有说明，这里补上自动生成的变更列表
-        run: gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+        # electron-builder 建出的 Release 标题就是 tag 名、且没有说明。
+        # 注意 gh release edit 并不支持 --generate-notes（那是 release create 的参数），
+        # 所以这里直接取 tag 指向提交的说明作为发布文案。
+        run: gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --latest --notes "$(git log -1 --pretty=%B)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
