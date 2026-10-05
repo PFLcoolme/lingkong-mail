@@ -103,6 +103,7 @@ const api: AppApi = {
   backupCreate: () => invoke<{ dir: string; size: number } | null>('backup:create'),
   backupRestore: () => invoke<boolean>('backup:restore'),
   openPath: (path) => invoke<void>('app:open-path', path),
+  openExternal: (url) => invoke<boolean>('app:open-external', url),
   windowAction: (action) => invoke<void>('window:action', action),
 
   onEvent: (listener: (event: MainEvent) => void) => {

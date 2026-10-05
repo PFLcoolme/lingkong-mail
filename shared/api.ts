@@ -124,6 +124,7 @@ export interface AppApi {
   backupCreate(): Promise<{ dir: string; size: number } | null>
   backupRestore(): Promise<boolean>
   openPath(path: string): Promise<void>
+  openExternal(url: string): Promise<boolean>
   windowAction(action: 'minimize' | 'maximize' | 'close'): Promise<void>
   onEvent(listener: (event: MainEvent) => void): () => void
 }

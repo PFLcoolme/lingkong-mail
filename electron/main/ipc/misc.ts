@@ -131,6 +131,14 @@ export function registerMiscHandlers(): void {
     return true
   })
 
+  // 只放行 http/https：避免把 file://、自定义协议等交给系统处理
+  handle('app:open-external', async (_event, url: string) => {
+    const target = String(url ?? '')
+    if (!/^https?:\/\//i.test(target)) return false
+    await shell.openExternal(target)
+    return true
+  })
+
   handle('window:action', async (_event, action: 'minimize' | 'maximize' | 'close') => {
     const window = getMainWindow()
     if (!window) return true

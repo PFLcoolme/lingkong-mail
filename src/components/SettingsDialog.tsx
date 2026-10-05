@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -830,11 +831,27 @@ function AboutTab(): React.ReactNode {
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         本地优先的桌面邮件客户端，邮件内容缓存在本机 SQLite 数据库中，支持离线全文检索。
       </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2.5 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
         当前版本 <b>v{version || '…'}</b>
         {BUILD_TIME ? ` · 构建于 ${new Date(BUILD_TIME).toLocaleString()}` : ''}
       </Typography>
+
+      <Alert severity="info" sx={{ mb: 2.5, borderRadius: 2, py: 0.5 }}>
+        <Typography sx={{ fontSize: 12, lineHeight: 1.7 }}>
+          <b>v0.3.0 是开源社区版的最后一个版本。</b>
+          此后项目转为闭源商业版继续开发，开源版本不再更新。感谢一路以来的使用与反馈。
+        </Typography>
+      </Alert>
+
       <Stack spacing={1.25}>
+        <Button
+          variant="outlined"
+          startIcon={<OpenIcon sx={{ fontSize: 16 }} />}
+          sx={{ justifyContent: 'flex-start', borderRadius: 2 }}
+          onClick={() => void api.openExternal('https://kongling.talklink.icu/')}
+        >
+          官方网站 kongling.talklink.icu
+        </Button>
         <Box>
           <Button
             variant="outlined"
