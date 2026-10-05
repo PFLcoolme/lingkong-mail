@@ -1,6 +1,6 @@
 # Maintainer: cool <tuooiwc@foxmail.com>
 pkgname=kongling-mail-bin
-pkgver=0.2.3
+pkgver=0.3.0
 pkgrel=1
 pkgdesc='本地桌面邮箱管理客户端，支持 IMAP/SMTP/POP3/OAuth2/Exchange'
 arch=('x86_64')
@@ -36,7 +36,7 @@ source=(
   "LICENSE::https://raw.githubusercontent.com/PFLcoolme/lingkong-mail/v${pkgver}/LICENSE"
 )
 sha256sums=(
-  'a249a24ea355da6a6ace4fd834683f3504cf2916baa408e25a058f8717240646'
+  '20e5b46f55991d18e8bc76e35ddea1d4425794b016935adfe4a15b2cd7b0e58d'
   '3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986'
 )
 

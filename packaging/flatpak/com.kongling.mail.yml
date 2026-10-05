@@ -49,15 +49,16 @@ modules:
         "${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/com.kongling.mail.png"
     sources:
       - type: file
-        url: https://github.com/PFLcoolme/lingkong-mail/releases/download/v0.2.3/kongling-mail-0.2.3-x86_64.tar.gz
-        sha256: PLACEHOLDER_REPLACE_WITH_REAL_SHA256
+        # 注意：electron-builder 对 tar.gz 目标把 ${arch} 展开为 x64（AppImage 是 x86_64）
+        url: https://github.com/PFLcoolme/lingkong-mail/releases/download/v0.3.0/kongling-mail-0.3.0-x64.tar.gz
+        sha256: 7228d299a44929679dcc6bcedae6ec2fb654b4125b7acedb9b87f0faa15bab69
         x-checker-data:
           type: json
           url: https://api.github.com/repos/PFLcoolme/lingkong-mail/releases/latest
           version-query: .tag_name | sub("^v"; "")
           url-query: >-
             .assets[]
-            | select(.name == "kongling-mail-" + $version + "-x86_64.tar.gz")
+            | select(.name == "kongling-mail-" + $version + "-x64.tar.gz")
             | .browser_download_url
       - type: file
         path: com.kongling.mail.desktop

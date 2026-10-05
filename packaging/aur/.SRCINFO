@@ -1,6 +1,6 @@
 pkgbase = kongling-mail-bin
 	pkgdesc = 本地桌面邮箱管理客户端，支持 IMAP/SMTP/POP3/OAuth2/Exchange
-	pkgver = 0.2.3
+	pkgver = 0.3.0
 	pkgrel = 1
 	url = https://github.com/PFLcoolme/lingkong-mail
 	arch = x86_64
@@ -22,9 +22,9 @@ pkgbase = kongling-mail-bin
 	conflicts = kongling-mail
 	options = !strip
 	options = !debug
-	source = kongling-mail-0.2.3.AppImage::https://github.com/PFLcoolme/lingkong-mail/releases/download/v0.2.3/kongling-mail-0.2.3-x86_64.AppImage
-	source = LICENSE::https://raw.githubusercontent.com/PFLcoolme/lingkong-mail/v0.2.3/LICENSE
-	sha256sums = a249a24ea355da6a6ace4fd834683f3504cf2916baa408e25a058f8717240646
+	source = kongling-mail-0.3.0.AppImage::https://github.com/PFLcoolme/lingkong-mail/releases/download/v0.3.0/kongling-mail-0.3.0-x86_64.AppImage
+	source = LICENSE::https://raw.githubusercontent.com/PFLcoolme/lingkong-mail/v0.3.0/LICENSE
+	sha256sums = 20e5b46f55991d18e8bc76e35ddea1d4425794b016935adfe4a15b2cd7b0e58d
 	sha256sums = 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
 
 pkgname = kongling-mail-bin
