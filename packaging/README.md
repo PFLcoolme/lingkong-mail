@@ -120,8 +120,12 @@ flatpak build-bundle repo kongling-mail.flatpak com.kongling.mail
 
 ---
 
-## 已知待办
+## 许可协议
 
-- **许可协议尚未统一**：仓库根目录的 `LICENSE` 是 GPL-3.0 全文，而 `package.json`
-  与打包产物标注的是 MIT。上架前必须二选一，`PKGBUILD` 的 `license=` 与
-  `metainfo.xml` 的 `<project_license>` 都要跟着改。（当前均按 MIT 填写）
+项目以 **GPL-3.0-or-later** 发布，完整条款见仓库根目录的 `LICENSE`。
+
+对打包的影响：GPL 要求分发二进制时一并提供许可文本与获取对应源码的方式，因此
+
+- `PKGBUILD` 会额外下载 `LICENSE` 并安装到 `/usr/share/licenses/kongling-mail-bin/`，
+  `url` 指向源码仓库作为「获取对应源码的方式」
+- `metainfo.xml` 的 `<project_license>` 使用 SPDX 标识 `GPL-3.0-or-later`

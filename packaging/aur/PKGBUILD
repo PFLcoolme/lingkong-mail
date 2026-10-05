@@ -5,7 +5,9 @@ pkgrel=1
 pkgdesc='本地桌面邮箱管理客户端，支持 IMAP/SMTP/POP3/OAuth2/Exchange'
 arch=('x86_64')
 url='https://github.com/PFLcoolme/lingkong-mail'
-license=('MIT')
+# GPL-3.0 要求分发二进制时一并提供许可文本与获取对应源码的方式：
+# 源码地址见上方 url，许可文本随包安装到 /usr/share/licenses/
+license=('GPL-3.0-or-later')
 depends=(
   'gtk3'
   'nss'
@@ -30,8 +32,13 @@ options=('!strip' '!debug')
 
 source=(
   "kongling-mail-${pkgver}.AppImage::https://github.com/PFLcoolme/lingkong-mail/releases/download/v${pkgver}/kongling-mail-${pkgver}-x86_64.AppImage"
+  # GPL 要求随二进制一并分发许可文本
+  "LICENSE::https://raw.githubusercontent.com/PFLcoolme/lingkong-mail/v${pkgver}/LICENSE"
 )
-sha256sums=('a249a24ea355da6a6ace4fd834683f3504cf2916baa408e25a058f8717240646')
+sha256sums=(
+  'a249a24ea355da6a6ace4fd834683f3504cf2916baa408e25a058f8717240646'
+  '3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986'
+)
 
 prepare() {
   chmod +x "kongling-mail-${pkgver}.AppImage"
@@ -69,4 +76,7 @@ package() {
   # 供桌面环境与命令行调用；上游 deb 也是通过 /usr/bin 暴露入口
   install -d "${pkgdir}/usr/bin"
   ln -s /opt/kongling-mail/kongling-mail "${pkgdir}/usr/bin/kongling-mail"
+
+  # GPL 要求分发二进制时附带许可文本
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

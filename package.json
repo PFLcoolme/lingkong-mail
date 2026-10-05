@@ -5,7 +5,7 @@
   "description": "适用于 Linux 的本地桌面邮箱管理客户端",
   "main": "out/main/index.js",
   "author": "cool",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
